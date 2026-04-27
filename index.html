@@ -1,0 +1,1051 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Borealis Design — Light, motion, and a little bit of magic.</title>
+<meta name="description" content="A small studio crafting websites, brands, and autonomous AI systems for the businesses that won't blend in." />
+<meta name="theme-color" content="#07060d" />
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet" />
+
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+
+<style>
+  :root {
+    --bg: #07060d;
+    --bg-2: #0c0a18;
+    --fg: #f5f3ff;
+    --muted: #9b97b3;
+    --border: rgba(255, 255, 255, 0.08);
+    --border-strong: rgba(255, 255, 255, 0.16);
+    --aurora-1: #ff4d8d;   /* magenta */
+    --aurora-2: #a855f7;   /* purple */
+    --aurora-3: #4f7cff;   /* blue   */
+    --aurora-4: #22d3ee;   /* cyan   */
+    --aurora-5: #fbbf24;   /* gold   */
+    --aurora-6: #34d399;   /* mint   */
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
+    cursor: default;
+  }
+  .serif { font-family: 'Instrument Serif', 'Times New Roman', serif; font-weight: 400; font-style: italic; }
+
+  /* ========== Aurora background blobs ========== */
+  .aurora-stage {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    z-index: 0;
+    pointer-events: none;
+  }
+  .aurora-blob {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(110px);
+    opacity: 0.55;
+    mix-blend-mode: screen;
+    will-change: transform;
+  }
+  .aurora-blob.b1 { background: var(--aurora-1); width: 620px; height: 620px; top: -120px; left: -160px; animation: float1 16s ease-in-out infinite alternate; }
+  .aurora-blob.b2 { background: var(--aurora-2); width: 720px; height: 720px; top: 80px;   right: -220px; animation: float2 20s ease-in-out infinite alternate; }
+  .aurora-blob.b3 { background: var(--aurora-3); width: 560px; height: 560px; bottom: -140px; left: 28%;  animation: float3 18s ease-in-out infinite alternate; }
+  .aurora-blob.b4 { background: var(--aurora-4); width: 420px; height: 420px; top: 38%;  left: 52%; animation: float4 22s ease-in-out infinite alternate; }
+  .aurora-blob.b5 { background: var(--aurora-6); width: 380px; height: 380px; bottom: 5%; right: 10%; animation: float5 24s ease-in-out infinite alternate; }
+
+  @keyframes float1 { from { transform: translate(0,0) scale(1); }   to { transform: translate(220px, 120px) scale(1.25); } }
+  @keyframes float2 { from { transform: translate(0,0) scale(1); }   to { transform: translate(-180px, 220px) scale(0.9); } }
+  @keyframes float3 { from { transform: translate(0,0) scale(1); }   to { transform: translate(160px, -220px) scale(1.15); } }
+  @keyframes float4 { from { transform: translate(0,0) scale(1); }   to { transform: translate(-220px, -120px) scale(1.3); } }
+  @keyframes float5 { from { transform: translate(0,0) scale(1); }   to { transform: translate(120px,  -180px) scale(0.85); } }
+
+  /* Subtle grain */
+  .noise {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.05;
+    z-index: 1;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.6'/%3E%3C/svg%3E");
+    mix-blend-mode: overlay;
+  }
+
+  /* ========== Frosted nav ========== */
+  .nav-glass {
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    background: rgba(7, 6, 13, 0.45);
+    border-bottom: 1px solid transparent;
+    transition: background 0.4s ease, border-color 0.4s ease, padding 0.3s ease;
+  }
+  .nav-glass.scrolled {
+    background: rgba(7, 6, 13, 0.78);
+    border-bottom-color: var(--border);
+  }
+
+  /* ========== Hero sub (legible over aurora) ========== */
+  .hero-sub {
+    color: rgba(255, 255, 255, 0.92);
+    text-shadow: 0 2px 24px rgba(0, 0, 0, 0.55), 0 1px 2px rgba(0, 0, 0, 0.4);
+  }
+
+  /* ========== Aurora gradient text ========== */
+  .aurora-text {
+    background: linear-gradient(120deg, var(--aurora-1), var(--aurora-2), var(--aurora-3), var(--aurora-4), var(--aurora-1));
+    background-size: 300% 300%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: gradient 9s ease infinite;
+  }
+  @keyframes gradient {
+    0%   { background-position: 0% 50%; }
+    50%  { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+
+  /* ========== Glass cards ========== */
+  .glass-card {
+    background: linear-gradient(135deg, rgba(255,255,255,0.045), rgba(255,255,255,0.012));
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    border: 1px solid var(--border);
+    border-radius: 28px;
+    transition: transform 0.5s cubic-bezier(0.2, 0.9, 0.3, 1), border-color 0.4s ease, background 0.4s ease;
+    position: relative;
+    overflow: hidden;
+  }
+  .glass-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 28px;
+    padding: 1px;
+    background: linear-gradient(135deg, rgba(255,255,255,0.18), rgba(255,255,255,0));
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+            mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+            mask-composite: exclude;
+    pointer-events: none;
+    opacity: 0.6;
+  }
+  .glass-card:hover {
+    transform: translateY(-6px);
+    border-color: var(--border-strong);
+  }
+
+  /* ========== Buttons ========== */
+  .btn-primary {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 16px 28px;
+    border-radius: 999px;
+    font-weight: 500;
+    color: #0b0a14;
+    background: linear-gradient(120deg, var(--aurora-4), var(--aurora-2), var(--aurora-1));
+    background-size: 200% 200%;
+    transition: transform 0.3s cubic-bezier(0.2, 0.9, 0.3, 1), background-position 0.6s ease, box-shadow 0.4s ease;
+    box-shadow: 0 8px 40px -8px rgba(168, 85, 247, 0.5);
+  }
+  .btn-primary:hover {
+    background-position: 100% 50%;
+    box-shadow: 0 12px 50px -8px rgba(255, 77, 141, 0.6);
+  }
+  .btn-ghost {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 16px 28px;
+    border-radius: 999px;
+    font-weight: 500;
+    color: var(--fg);
+    border: 1px solid var(--border-strong);
+    background: rgba(255,255,255,0.02);
+    backdrop-filter: blur(10px);
+    transition: background 0.3s ease, border-color 0.3s ease, transform 0.3s ease;
+  }
+  .btn-ghost:hover { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.3); }
+
+  /* ========== Marquee ========== */
+  .marquee-wrap { overflow: hidden; mask-image: linear-gradient(to right, transparent, black 8%, black 92%, transparent); }
+  .marquee {
+    display: flex;
+    gap: 4rem;
+    width: max-content;
+    animation: marquee 38s linear infinite;
+  }
+  @keyframes marquee {
+    from { transform: translateX(0); }
+    to   { transform: translateX(-50%); }
+  }
+  .marquee span { white-space: nowrap; font-family: 'Instrument Serif', serif; font-style: italic; font-size: clamp(2.2rem, 5vw, 4rem); color: rgba(255,255,255,0.9); }
+  .marquee .dot { color: var(--aurora-1); }
+
+  /* ========== Process timeline ========== */
+  .timeline-line {
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    pathLength: 1;
+  }
+
+  /* ========== Selection / scrollbar ========== */
+  ::selection { background: var(--aurora-2); color: #fff; }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.18); }
+
+  /* ========== Reveal ========== */
+  .reveal { opacity: 0; transform: translateY(40px); }
+
+  /* ========== Cursor halo ========== */
+  .cursor-halo {
+    position: fixed;
+    width: 380px; height: 380px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(168,85,247,0.18) 0%, rgba(168,85,247,0) 70%);
+    pointer-events: none;
+    transform: translate(-50%, -50%);
+    z-index: 1;
+    transition: opacity 0.3s ease;
+    mix-blend-mode: screen;
+    will-change: transform;
+  }
+  @media (max-width: 768px) { .cursor-halo { display: none; } }
+
+  /* ========== Service icon orbit ========== */
+  .icon-frame {
+    width: 56px; height: 56px;
+    display: grid; place-items: center;
+    border-radius: 18px;
+    background: linear-gradient(135deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+    border: 1px solid var(--border-strong);
+    color: white;
+  }
+
+  /* ========== Agent network visualization ========== */
+  .node {
+    position: absolute;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--aurora-3);
+    box-shadow: 0 0 30px 4px var(--aurora-3);
+    transform: translate(-50%, -50%);
+  }
+  .node.n1 { background: var(--aurora-1); box-shadow: 0 0 30px 4px var(--aurora-1); }
+  .node.n2 { background: var(--aurora-2); box-shadow: 0 0 30px 4px var(--aurora-2); }
+  .node.n3 { background: var(--aurora-4); box-shadow: 0 0 30px 4px var(--aurora-4); }
+  .node.n4 { background: var(--aurora-5); box-shadow: 0 0 30px 4px var(--aurora-5); }
+  .node.n5 { background: var(--aurora-6); box-shadow: 0 0 30px 4px var(--aurora-6); }
+  .node-pulse {
+    position: absolute;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    animation: pulse 2.4s ease-out infinite;
+  }
+  @keyframes pulse {
+    0%   { transform: translate(-50%, -50%) scale(1);   opacity: 0.7; }
+    100% { transform: translate(-50%, -50%) scale(4);   opacity: 0;   }
+  }
+
+  /* ========== Stat dot grid ========== */
+  .grid-bg {
+    background-image:
+      radial-gradient(rgba(255,255,255,0.06) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+
+  /* ========== Form ========== */
+  .input {
+    width: 100%;
+    padding: 16px 20px;
+    border-radius: 16px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid var(--border);
+    color: var(--fg);
+    font-family: inherit;
+    font-size: 16px;
+    transition: border-color 0.3s ease, background 0.3s ease;
+  }
+  .input:focus {
+    outline: none;
+    border-color: var(--aurora-3);
+    background: rgba(255,255,255,0.05);
+  }
+  .input::placeholder { color: var(--muted); }
+
+  /* ========== Tag pills ========== */
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--border);
+    font-size: 13px;
+    color: var(--muted);
+    backdrop-filter: blur(6px);
+  }
+  .pill .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--aurora-6);
+    box-shadow: 0 0 10px var(--aurora-6);
+  }
+
+  /* Anchor offset for fixed nav */
+  section[id] { scroll-margin-top: 80px; }
+</style>
+</head>
+<body class="antialiased">
+
+<!-- Cursor halo -->
+<div class="cursor-halo" id="cursorHalo"></div>
+
+<!-- ========== NAV ========== -->
+<nav id="nav" class="nav-glass fixed top-0 left-0 right-0 z-50 px-6 md:px-10 py-4">
+  <div class="max-w-7xl mx-auto flex items-center justify-between">
+    <a href="#top" class="flex items-center gap-3 group">
+      <span class="relative w-9 h-9 grid place-items-center">
+        <span class="absolute inset-0 rounded-xl" style="background: conic-gradient(from 0deg, var(--aurora-1), var(--aurora-2), var(--aurora-3), var(--aurora-4), var(--aurora-1)); filter: blur(8px); opacity: 0.7;"></span>
+        <span class="absolute inset-[3px] rounded-[10px] bg-[var(--bg)]"></span>
+        <svg class="relative" width="18" height="18" viewBox="0 0 24 24" fill="none">
+          <path d="M3 18 Q6 6 12 12 T 21 6" stroke="white" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </span>
+      <span class="font-semibold tracking-tight text-[17px]">Borealis<span class="text-[var(--muted)] font-light">&nbsp;Design</span></span>
+    </a>
+
+    <div class="hidden md:flex items-center gap-8 text-sm text-[var(--muted)]">
+      <a href="#services" class="hover:text-white transition">Services</a>
+      <a href="#automate" class="hover:text-white transition">Automate</a>
+      <a href="#process" class="hover:text-white transition">Process</a>
+      <a href="#work" class="hover:text-white transition">Work</a>
+      <a href="#contact" class="hover:text-white transition">Contact</a>
+    </div>
+
+    <a href="#contact" class="hidden md:inline-flex btn-ghost text-sm" style="padding: 10px 18px;">
+      Start a project
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </a>
+
+    <button id="menuBtn" class="md:hidden text-white" aria-label="Open menu">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    </button>
+  </div>
+</nav>
+
+<!-- ========== HERO ========== -->
+<section id="top" class="relative min-h-screen flex items-center px-6 md:px-10 pt-32 pb-24 overflow-hidden">
+  <div class="aurora-stage">
+    <div class="aurora-blob b1"></div>
+    <div class="aurora-blob b2"></div>
+    <div class="aurora-blob b3"></div>
+    <div class="aurora-blob b4"></div>
+    <div class="aurora-blob b5"></div>
+  </div>
+  <div class="noise"></div>
+
+  <div class="relative z-10 max-w-7xl mx-auto w-full">
+    <div class="reveal pill mb-8" data-stagger="0">
+      <span class="dot"></span>
+      <span>Now booking projects for Q3 2026</span>
+    </div>
+
+    <h1 class="reveal text-[clamp(3rem,9vw,8.5rem)] leading-[0.95] font-semibold tracking-[-0.04em] max-w-6xl" data-stagger="1">
+      Design<br />
+      that <span class="serif aurora-text font-normal italic">moves</span>.
+    </h1>
+
+    <p class="reveal mt-10 text-lg md:text-xl hero-sub max-w-2xl leading-relaxed" data-stagger="2">
+      Borealis is a small studio crafting websites, brands, and autonomous AI systems
+      for the businesses that won't blend in.
+    </p>
+
+    <div class="reveal mt-12 flex flex-wrap gap-4 items-center" data-stagger="3">
+      <a href="#contact" class="btn-primary magnetic">
+        Start a project
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </a>
+      <a href="#services" class="btn-ghost">
+        See how we work
+      </a>
+    </div>
+
+    <!-- Scroll indicator -->
+    <div class="absolute bottom-8 left-1/2 -translate-x-1/2 hidden md:flex flex-col items-center gap-3 text-xs text-[var(--muted)] tracking-[0.3em] uppercase">
+      <span>Scroll</span>
+      <span class="w-px h-12 bg-gradient-to-b from-white/30 to-transparent"></span>
+    </div>
+  </div>
+</section>
+
+<!-- ========== MARQUEE ========== -->
+<section class="relative py-12 border-y border-white/5 bg-[var(--bg-2)] overflow-hidden">
+  <div class="marquee-wrap">
+    <div class="marquee">
+      <span>Websites <span class="dot">·</span></span>
+      <span>Brand systems <span class="dot">·</span></span>
+      <span>Autonomous agents <span class="dot">·</span></span>
+      <span>Social presence <span class="dot">·</span></span>
+      <span>Motion design <span class="dot">·</span></span>
+      <span>Editorial <span class="dot">·</span></span>
+      <span>Identity <span class="dot">·</span></span>
+      <!-- duplicate for seamless loop -->
+      <span>Websites <span class="dot">·</span></span>
+      <span>Brand systems <span class="dot">·</span></span>
+      <span>Autonomous agents <span class="dot">·</span></span>
+      <span>Social presence <span class="dot">·</span></span>
+      <span>Motion design <span class="dot">·</span></span>
+      <span>Editorial <span class="dot">·</span></span>
+      <span>Identity <span class="dot">·</span></span>
+    </div>
+  </div>
+</section>
+
+<!-- ========== SERVICES ========== -->
+<section id="services" class="relative px-6 md:px-10 py-32 md:py-44">
+  <div class="max-w-7xl mx-auto">
+    <div class="grid md:grid-cols-12 gap-10 mb-20 items-end">
+      <div class="md:col-span-7">
+        <p class="reveal pill mb-6"><span class="dot"></span> What we do</p>
+        <h2 class="reveal text-[clamp(2.5rem,6vw,5rem)] leading-[1] font-semibold tracking-[-0.03em]">
+          Four pillars.<br />
+          <span class="serif italic text-[var(--muted)]">One studio.</span>
+        </h2>
+      </div>
+      <p class="reveal md:col-span-5 text-[var(--muted)] text-lg leading-relaxed">
+        We work across the full digital surface — from the home page that introduces you to the autonomous systems that keep you visible while you sleep.
+      </p>
+    </div>
+
+    <div class="grid md:grid-cols-2 gap-6">
+      <!-- BUILD -->
+      <article class="reveal glass-card p-8 md:p-10">
+        <div class="flex items-start justify-between mb-8">
+          <div class="icon-frame">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M4 6h16M4 12h10M4 18h7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          </div>
+          <span class="text-xs tracking-[0.3em] text-[var(--muted)]">01 / BUILD</span>
+        </div>
+        <h3 class="text-3xl md:text-4xl font-semibold tracking-tight mb-4">Websites that scroll beautifully.</h3>
+        <p class="text-[var(--muted)] leading-relaxed mb-8">
+          Custom-coded sites, landing pages, and digital experiences engineered for speed and built to feel alive. No themes. No drag-drop builders. Every pixel deliberate.
+        </p>
+        <ul class="text-sm text-[var(--muted)] space-y-2">
+          <li class="flex items-center gap-2"><span class="w-1 h-1 rounded-full bg-[var(--aurora-1)]"></span> Marketing sites &amp; landing pages</li>
+          <li class="flex items-center gap-2"><span class="w-1 h-1 rounded-full bg-[var(--aurora-2)]"></span> Interactive product experiences</li>
+          <li class="flex items-center gap-2"><span class="w-1 h-1 rounded-full bg-[var(--aurora-3)]"></span> Motion-rich storytelling</li>
+        </ul>
+      </article>
+
+      <!-- CULTIVATE -->
+      <article class="reveal glass-card p-8 md:p-10">
+        <div class="flex items-start justify-between mb-8">
+          <div class="icon-frame">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 2v6M12 22v-6M4.93 4.93l4.24 4.24M14.83 14.83l4.24 4.24M2 12h6M16 12h6M4.93 19.07l4.24-4.24M14.83 9.17l4.24-4.24" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          </div>
+          <span class="text-xs tracking-[0.3em] text-[var(--muted)]">02 / CULTIVATE</span>
+        </div>
+        <h3 class="text-3xl md:text-4xl font-semibold tracking-tight mb-4">A presence worth following.</h3>
+        <p class="text-[var(--muted)] leading-relaxed mb-8">
+          Consistency is a moat. We curate your platforms — voice, cadence, visuals — so you show up the way you want to be seen, every day, across every channel.
+        </p>
+        <ul class="text-sm text-[var(--muted)] space-y-2">
+          <li class="flex items-center gap-2"><span class="w-1 h-1 rounded-full bg-[var(--aurora-1)]"></span> Content strategy &amp; calendars</li>
+          <li class="flex items-center gap-2"><span class="w-1 h-1 rounded-full bg-[var(--aurora-2)]"></span> Platform management</li>
+          <li class="flex items-center gap-2"><span class="w-1 h-1 rounded-full bg-[var(--aurora-3)]"></span> Community &amp; engagement</li>
+        </ul>
+      </article>
+
+      <!-- AUTOMATE -->
+      <article class="reveal glass-card p-8 md:p-10">
+        <div class="flex items-start justify-between mb-8">
+          <div class="icon-frame" style="background: linear-gradient(135deg, rgba(255,77,141,0.2), rgba(168,85,247,0.15)); border-color: rgba(255,77,141,0.4);">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 2l2.5 5L20 8l-4 4 1 6-5-3-5 3 1-6-4-4 5.5-1L12 2z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+          </div>
+          <span class="text-xs tracking-[0.3em]" style="color: var(--aurora-1);">03 / AUTOMATE</span>
+        </div>
+        <h3 class="text-3xl md:text-4xl font-semibold tracking-tight mb-4">
+          Autonomous agents that <span class="serif italic aurora-text">work the night shift</span>.
+        </h3>
+        <p class="text-[var(--muted)] leading-relaxed mb-8">
+          We deploy AI agents that schedule posts, monitor mentions, surface trends, and report on what's working — so the work continues whether you're at the desk or not.
+        </p>
+        <ul class="text-sm text-[var(--muted)] space-y-2">
+          <li class="flex items-center gap-2"><span class="w-1 h-1 rounded-full bg-[var(--aurora-1)]"></span> Scheduled &amp; reactive posting</li>
+          <li class="flex items-center gap-2"><span class="w-1 h-1 rounded-full bg-[var(--aurora-2)]"></span> Mention &amp; trend monitoring</li>
+          <li class="flex items-center gap-2"><span class="w-1 h-1 rounded-full bg-[var(--aurora-3)]"></span> Weekly insight reports</li>
+        </ul>
+      </article>
+
+      <!-- SHAPE -->
+      <article class="reveal glass-card p-8 md:p-10">
+        <div class="flex items-start justify-between mb-8">
+          <div class="icon-frame">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M12 3v18M3 12h18" stroke="currentColor" stroke-width="2"/></svg>
+          </div>
+          <span class="text-xs tracking-[0.3em] text-[var(--muted)]">04 / SHAPE</span>
+        </div>
+        <h3 class="text-3xl md:text-4xl font-semibold tracking-tight mb-4">Brand identity as a system.</h3>
+        <p class="text-[var(--muted)] leading-relaxed mb-8">
+          A logo isn't a brand. We build the system — typography, color, motion, voice — that holds together across every surface, so your brand feels consistent everywhere it shows up.
+        </p>
+        <ul class="text-sm text-[var(--muted)] space-y-2">
+          <li class="flex items-center gap-2"><span class="w-1 h-1 rounded-full bg-[var(--aurora-1)]"></span> Logo &amp; visual identity</li>
+          <li class="flex items-center gap-2"><span class="w-1 h-1 rounded-full bg-[var(--aurora-2)]"></span> Type &amp; color systems</li>
+          <li class="flex items-center gap-2"><span class="w-1 h-1 rounded-full bg-[var(--aurora-3)]"></span> Brand voice &amp; guidelines</li>
+        </ul>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ========== AUTOMATE SPOTLIGHT ========== -->
+<section id="automate" class="relative px-6 md:px-10 py-32 md:py-44 overflow-hidden">
+  <div class="aurora-stage" style="opacity: 0.4;">
+    <div class="aurora-blob b1" style="top: 10%; left: 60%;"></div>
+    <div class="aurora-blob b3" style="bottom: 0; left: 0;"></div>
+  </div>
+
+  <div class="relative max-w-7xl mx-auto">
+    <div class="grid md:grid-cols-12 gap-12 items-center">
+      <div class="md:col-span-6">
+        <p class="reveal pill mb-6"><span class="dot"></span> The differentiator</p>
+        <h2 class="reveal text-[clamp(2.2rem,5vw,4.2rem)] leading-[1.05] font-semibold tracking-[-0.03em] mb-6">
+          We don't <span class="serif italic text-[var(--muted)]">just build</span> your presence.<br />
+          We give it a <span class="aurora-text">pulse</span>.
+        </h2>
+        <p class="reveal text-[var(--muted)] text-lg leading-relaxed mb-10">
+          Most agencies hand you a website and a content calendar and call it done. We deploy a small fleet of AI agents that listen to your industry, watch for mentions, draft responses, schedule posts, and report back. The site is the storefront. The agents are the staff.
+        </p>
+
+        <div class="reveal grid grid-cols-2 gap-4 mb-10">
+          <div class="p-5 rounded-2xl border border-[var(--border)]">
+            <div class="text-3xl font-semibold aurora-text">24/7</div>
+            <div class="text-sm text-[var(--muted)] mt-1">Listening &amp; responding</div>
+          </div>
+          <div class="p-5 rounded-2xl border border-[var(--border)]">
+            <div class="text-3xl font-semibold aurora-text">~80%</div>
+            <div class="text-sm text-[var(--muted)] mt-1">Less manual posting</div>
+          </div>
+          <div class="p-5 rounded-2xl border border-[var(--border)]">
+            <div class="text-3xl font-semibold aurora-text">5+</div>
+            <div class="text-sm text-[var(--muted)] mt-1">Channels per agent</div>
+          </div>
+          <div class="p-5 rounded-2xl border border-[var(--border)]">
+            <div class="text-3xl font-semibold aurora-text">Weekly</div>
+            <div class="text-sm text-[var(--muted)] mt-1">Insight reports</div>
+          </div>
+        </div>
+
+        <a href="#contact" class="reveal btn-ghost magnetic">
+          See it in action
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </a>
+      </div>
+
+      <!-- Network visualization -->
+      <div class="md:col-span-6">
+        <div class="reveal relative aspect-square w-full max-w-[560px] mx-auto rounded-3xl border border-[var(--border)] overflow-hidden grid-bg" id="networkBox">
+          <!-- SVG connection lines -->
+          <svg class="absolute inset-0 w-full h-full" id="networkSvg" viewBox="0 0 100 100" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="line-grad" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stop-color="#a855f7" stop-opacity="0"/>
+                <stop offset="50%" stop-color="#a855f7" stop-opacity="0.8"/>
+                <stop offset="100%" stop-color="#a855f7" stop-opacity="0"/>
+              </linearGradient>
+            </defs>
+            <!-- Lines drawn from center to each satellite -->
+            <line x1="50" y1="50" x2="20" y2="20" stroke="url(#line-grad)" stroke-width="0.3" class="net-line"/>
+            <line x1="50" y1="50" x2="80" y2="22" stroke="url(#line-grad)" stroke-width="0.3" class="net-line"/>
+            <line x1="50" y1="50" x2="85" y2="62" stroke="url(#line-grad)" stroke-width="0.3" class="net-line"/>
+            <line x1="50" y1="50" x2="62" y2="85" stroke="url(#line-grad)" stroke-width="0.3" class="net-line"/>
+            <line x1="50" y1="50" x2="22" y2="78" stroke="url(#line-grad)" stroke-width="0.3" class="net-line"/>
+            <line x1="50" y1="50" x2="14" y2="50" stroke="url(#line-grad)" stroke-width="0.3" class="net-line"/>
+          </svg>
+
+          <!-- Center "core" node -->
+          <div class="absolute" style="top: 50%; left: 50%;">
+            <div class="absolute" style="top:0; left:0; width: 80px; height: 80px; border-radius: 50%; transform: translate(-50%, -50%); background: radial-gradient(circle, rgba(168,85,247,0.4) 0%, rgba(168,85,247,0) 70%);"></div>
+            <div class="absolute font-medium text-sm whitespace-nowrap" style="top: 50%; left: 50%; transform: translate(-50%, -50%); padding: 10px 18px; border-radius: 999px; background: rgba(168,85,247,0.15); border: 1px solid rgba(168,85,247,0.5); backdrop-filter: blur(10px);">
+              <span class="text-white">Borealis Core</span>
+            </div>
+          </div>
+
+          <!-- Satellite nodes -->
+          <div class="node n1" style="top: 20%; left: 20%;"></div>
+          <div class="node-pulse" style="top: 20%; left: 20%; background: var(--aurora-1);"></div>
+          <span class="absolute text-[11px] text-[var(--muted)] tracking-wider uppercase" style="top: 12%; left: 20%; transform: translateX(-50%);">Instagram</span>
+
+          <div class="node n2" style="top: 22%; left: 80%;"></div>
+          <div class="node-pulse" style="top: 22%; left: 80%; background: var(--aurora-2); animation-delay: 0.4s;"></div>
+          <span class="absolute text-[11px] text-[var(--muted)] tracking-wider uppercase" style="top: 14%; left: 80%; transform: translateX(-50%);">LinkedIn</span>
+
+          <div class="node n3" style="top: 62%; left: 85%;"></div>
+          <div class="node-pulse" style="top: 62%; left: 85%; background: var(--aurora-4); animation-delay: 0.8s;"></div>
+          <span class="absolute text-[11px] text-[var(--muted)] tracking-wider uppercase" style="top: 70%; left: 85%; transform: translateX(-50%);">X</span>
+
+          <div class="node n4" style="top: 85%; left: 62%;"></div>
+          <div class="node-pulse" style="top: 85%; left: 62%; background: var(--aurora-5); animation-delay: 1.2s;"></div>
+          <span class="absolute text-[11px] text-[var(--muted)] tracking-wider uppercase" style="top: 92%; left: 62%; transform: translateX(-50%);">TikTok</span>
+
+          <div class="node n5" style="top: 78%; left: 22%;"></div>
+          <div class="node-pulse" style="top: 78%; left: 22%; background: var(--aurora-6); animation-delay: 1.6s;"></div>
+          <span class="absolute text-[11px] text-[var(--muted)] tracking-wider uppercase" style="top: 86%; left: 22%; transform: translateX(-50%);">Threads</span>
+
+          <div class="node" style="top: 50%; left: 14%;"></div>
+          <div class="node-pulse" style="top: 50%; left: 14%; background: var(--aurora-3); animation-delay: 2s;"></div>
+          <span class="absolute text-[11px] text-[var(--muted)] tracking-wider uppercase" style="top: 50%; left: 5%; transform: translateY(-50%);">Email</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== PROCESS ========== -->
+<section id="process" class="relative px-6 md:px-10 py-32 md:py-44 bg-[var(--bg-2)] overflow-hidden">
+  <div class="max-w-7xl mx-auto">
+    <div class="grid md:grid-cols-12 gap-10 mb-24 items-end">
+      <div class="md:col-span-7">
+        <p class="reveal pill mb-6"><span class="dot"></span> How we work</p>
+        <h2 class="reveal text-[clamp(2.5rem,6vw,5rem)] leading-[1] font-semibold tracking-[-0.03em]">
+          The <span class="serif italic">process</span>,<br />
+          drawn out.
+        </h2>
+      </div>
+      <p class="reveal md:col-span-5 text-[var(--muted)] text-lg leading-relaxed">
+        Every project moves through four stages. Each one builds on the last, and none of them get skipped.
+      </p>
+    </div>
+
+    <div class="relative" id="processTrack">
+      <!-- Drawing line -->
+      <svg class="absolute left-0 top-0 w-full h-full pointer-events-none hidden md:block" viewBox="0 0 100 100" preserveAspectRatio="none" style="height: 100%;">
+        <path id="processPath" class="timeline-line" d="M 8 12 Q 25 12 25 38 Q 25 50 50 50 Q 75 50 75 62 Q 75 88 92 88" stroke="url(#proc-grad)" stroke-width="0.4" fill="none" />
+        <defs>
+          <linearGradient id="proc-grad" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%"   stop-color="#ff4d8d"/>
+            <stop offset="33%"  stop-color="#a855f7"/>
+            <stop offset="66%"  stop-color="#4f7cff"/>
+            <stop offset="100%" stop-color="#22d3ee"/>
+          </linearGradient>
+        </defs>
+      </svg>
+
+      <div class="grid md:grid-cols-2 gap-x-16 gap-y-20 md:gap-y-32">
+        <div class="reveal">
+          <div class="text-7xl md:text-8xl font-semibold aurora-text leading-none mb-6">01</div>
+          <h3 class="text-2xl md:text-3xl font-semibold mb-4 tracking-tight">Discover</h3>
+          <p class="text-[var(--muted)] leading-relaxed">
+            We listen first. We audit your current presence, talk through your customers and competitors, and surface the angles that aren't being told yet. Nothing is designed in this phase — it's all questions.
+          </p>
+        </div>
+        <div class="reveal md:mt-32">
+          <div class="text-7xl md:text-8xl font-semibold aurora-text leading-none mb-6">02</div>
+          <h3 class="text-2xl md:text-3xl font-semibold mb-4 tracking-tight">Design</h3>
+          <p class="text-[var(--muted)] leading-relaxed">
+            Sketch, prototype, iterate — fast. We design in motion from day one, because how a site feels to scroll matters as much as how it looks in a screenshot. You'll see real prototypes, not flat mockups.
+          </p>
+        </div>
+        <div class="reveal">
+          <div class="text-7xl md:text-8xl font-semibold aurora-text leading-none mb-6">03</div>
+          <h3 class="text-2xl md:text-3xl font-semibold mb-4 tracking-tight">Build</h3>
+          <p class="text-[var(--muted)] leading-relaxed">
+            Custom code, no themes. We hand-write every site in modern HTML, CSS, and JavaScript so it loads fast, ages well, and lets us push the design further than any template would allow.
+          </p>
+        </div>
+        <div class="reveal md:mt-32">
+          <div class="text-7xl md:text-8xl font-semibold aurora-text leading-none mb-6">04</div>
+          <h3 class="text-2xl md:text-3xl font-semibold mb-4 tracking-tight">Sustain</h3>
+          <p class="text-[var(--muted)] leading-relaxed">
+            Launch is the start, not the finish. We deploy your AI agents, hook up the monitoring, and send weekly reports — so your presence keeps growing long after the site goes live.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== WORK / PORTFOLIO PLACEHOLDER ========== -->
+<section id="work" class="relative px-6 md:px-10 py-32 md:py-44">
+  <div class="max-w-7xl mx-auto">
+    <div class="grid md:grid-cols-12 gap-10 mb-20 items-end">
+      <div class="md:col-span-7">
+        <p class="reveal pill mb-6"><span class="dot"></span> Selected work</p>
+        <h2 class="reveal text-[clamp(2.5rem,6vw,5rem)] leading-[1] font-semibold tracking-[-0.03em]">
+          A small <span class="serif italic">portfolio</span>,<br />
+          made with care.
+        </h2>
+      </div>
+      <p class="reveal md:col-span-5 text-[var(--muted)] text-lg leading-relaxed">
+        We take on a handful of projects each quarter. Here's what we've been working on lately.
+      </p>
+    </div>
+
+    <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <!-- Each card -->
+      <a href="#" class="reveal glass-card p-6 group">
+        <div class="aspect-[4/5] rounded-2xl mb-6 overflow-hidden relative" style="background: linear-gradient(135deg, #ff4d8d, #a855f7);">
+          <div class="absolute inset-0" style="background: radial-gradient(circle at 30% 20%, rgba(255,255,255,0.4), transparent 50%);"></div>
+          <div class="absolute bottom-4 left-4 text-white/90 text-sm font-medium tracking-wider uppercase">Case 01</div>
+        </div>
+        <div class="flex items-end justify-between">
+          <div>
+            <h3 class="text-xl font-semibold mb-1">Lumen Roastery</h3>
+            <p class="text-sm text-[var(--muted)]">Brand · Site · Automation</p>
+          </div>
+          <svg class="text-white/40 group-hover:text-white transition" width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M7 17L17 7M17 7H8M17 7v9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </div>
+      </a>
+
+      <a href="#" class="reveal glass-card p-6 group">
+        <div class="aspect-[4/5] rounded-2xl mb-6 overflow-hidden relative" style="background: linear-gradient(135deg, #4f7cff, #22d3ee);">
+          <div class="absolute inset-0" style="background: radial-gradient(circle at 70% 30%, rgba(255,255,255,0.3), transparent 50%);"></div>
+          <div class="absolute bottom-4 left-4 text-white/90 text-sm font-medium tracking-wider uppercase">Case 02</div>
+        </div>
+        <div class="flex items-end justify-between">
+          <div>
+            <h3 class="text-xl font-semibold mb-1">Hartwell Studio</h3>
+            <p class="text-sm text-[var(--muted)]">Architecture · Site</p>
+          </div>
+          <svg class="text-white/40 group-hover:text-white transition" width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M7 17L17 7M17 7H8M17 7v9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </div>
+      </a>
+
+      <a href="#" class="reveal glass-card p-6 group">
+        <div class="aspect-[4/5] rounded-2xl mb-6 overflow-hidden relative" style="background: linear-gradient(135deg, #34d399, #fbbf24);">
+          <div class="absolute inset-0" style="background: radial-gradient(circle at 50% 50%, rgba(255,255,255,0.35), transparent 60%);"></div>
+          <div class="absolute bottom-4 left-4 text-white/90 text-sm font-medium tracking-wider uppercase">Case 03</div>
+        </div>
+        <div class="flex items-end justify-between">
+          <div>
+            <h3 class="text-xl font-semibold mb-1">Field Notes Co.</h3>
+            <p class="text-sm text-[var(--muted)]">Brand · Automation</p>
+          </div>
+          <svg class="text-white/40 group-hover:text-white transition" width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M7 17L17 7M17 7H8M17 7v9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </div>
+      </a>
+
+      <a href="#" class="reveal glass-card p-6 group">
+        <div class="aspect-[4/5] rounded-2xl mb-6 overflow-hidden relative" style="background: linear-gradient(135deg, #a855f7, #4f7cff);">
+          <div class="absolute inset-0" style="background: radial-gradient(circle at 80% 20%, rgba(255,255,255,0.4), transparent 50%);"></div>
+          <div class="absolute bottom-4 left-4 text-white/90 text-sm font-medium tracking-wider uppercase">Case 04</div>
+        </div>
+        <div class="flex items-end justify-between">
+          <div>
+            <h3 class="text-xl font-semibold mb-1">Northwind Mfg.</h3>
+            <p class="text-sm text-[var(--muted)]">Site · Identity</p>
+          </div>
+          <svg class="text-white/40 group-hover:text-white transition" width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M7 17L17 7M17 7H8M17 7v9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </div>
+      </a>
+
+      <a href="#" class="reveal glass-card p-6 group">
+        <div class="aspect-[4/5] rounded-2xl mb-6 overflow-hidden relative" style="background: linear-gradient(135deg, #fbbf24, #ff4d8d);">
+          <div class="absolute inset-0" style="background: radial-gradient(circle at 20% 80%, rgba(255,255,255,0.4), transparent 60%);"></div>
+          <div class="absolute bottom-4 left-4 text-white/90 text-sm font-medium tracking-wider uppercase">Case 05</div>
+        </div>
+        <div class="flex items-end justify-between">
+          <div>
+            <h3 class="text-xl font-semibold mb-1">Saturn &amp; Sons</h3>
+            <p class="text-sm text-[var(--muted)]">Brand system</p>
+          </div>
+          <svg class="text-white/40 group-hover:text-white transition" width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M7 17L17 7M17 7H8M17 7v9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </div>
+      </a>
+
+      <a href="#" class="reveal glass-card p-6 group">
+        <div class="aspect-[4/5] rounded-2xl mb-6 overflow-hidden relative" style="background: linear-gradient(135deg, #22d3ee, #34d399);">
+          <div class="absolute inset-0" style="background: radial-gradient(circle at 60% 40%, rgba(255,255,255,0.35), transparent 50%);"></div>
+          <div class="absolute bottom-4 left-4 text-white/90 text-sm font-medium tracking-wider uppercase">Case 06</div>
+        </div>
+        <div class="flex items-end justify-between">
+          <div>
+            <h3 class="text-xl font-semibold mb-1">Halo Health</h3>
+            <p class="text-sm text-[var(--muted)]">Site · Automation</p>
+          </div>
+          <svg class="text-white/40 group-hover:text-white transition" width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M7 17L17 7M17 7H8M17 7v9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </div>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ========== PHILOSOPHY ========== -->
+<section class="relative px-6 md:px-10 py-32 md:py-44 overflow-hidden">
+  <div class="aurora-stage" style="opacity: 0.3;">
+    <div class="aurora-blob b2" style="top: 10%; left: -10%;"></div>
+    <div class="aurora-blob b4" style="bottom: 0; right: 0;"></div>
+  </div>
+  <div class="relative max-w-5xl mx-auto text-center">
+    <p class="reveal pill mb-8 mx-auto"><span class="dot"></span> Philosophy</p>
+    <h2 class="reveal text-[clamp(2rem,5vw,4rem)] leading-[1.15] font-medium tracking-[-0.02em]">
+      <span class="serif italic">"</span>The best brands feel like a <span class="aurora-text">place</span> —<br />
+      somewhere you actually want to spend time.<span class="serif italic">"</span>
+    </h2>
+    <p class="reveal mt-10 text-[var(--muted)] text-lg leading-relaxed max-w-2xl mx-auto">
+      Our work sits at the intersection of design, code, and intelligence. We build digital homes that don't just sit there. They breathe.
+    </p>
+
+    <div class="reveal mt-14 inline-flex items-center gap-3 text-sm text-[var(--muted)]">
+      <span class="w-10 h-px bg-white/20"></span>
+      <span>Cunningham, Founder</span>
+      <span class="w-10 h-px bg-white/20"></span>
+    </div>
+  </div>
+</section>
+
+<!-- ========== CONTACT ========== -->
+<section id="contact" class="relative px-6 md:px-10 py-32 md:py-44 bg-[var(--bg-2)] overflow-hidden">
+  <div class="aurora-stage" style="opacity: 0.5;">
+    <div class="aurora-blob b1" style="top: 20%; left: 10%;"></div>
+    <div class="aurora-blob b3" style="bottom: 10%; right: 20%;"></div>
+  </div>
+
+  <div class="relative max-w-5xl mx-auto">
+    <div class="text-center mb-16">
+      <p class="reveal pill mb-6 mx-auto"><span class="dot"></span> Let's begin</p>
+      <h2 class="reveal text-[clamp(2.5rem,7vw,6rem)] leading-[0.95] font-semibold tracking-[-0.03em]">
+        Build something<br />
+        <span class="serif italic aurora-text">memorable</span>.
+      </h2>
+      <p class="reveal mt-8 text-[var(--muted)] text-lg max-w-xl mx-auto">
+        Tell us about your project. We respond within one business day, every time.
+      </p>
+    </div>
+
+    <form class="reveal glass-card p-8 md:p-12 grid md:grid-cols-2 gap-5" onsubmit="handleSubmit(event)">
+      <div>
+        <label class="text-xs uppercase tracking-[0.2em] text-[var(--muted)] mb-2 block">Your name</label>
+        <input class="input" type="text" name="name" placeholder="Jane Cunningham" required />
+      </div>
+      <div>
+        <label class="text-xs uppercase tracking-[0.2em] text-[var(--muted)] mb-2 block">Email</label>
+        <input class="input" type="email" name="email" placeholder="jane@company.com" required />
+      </div>
+      <div class="md:col-span-2">
+        <label class="text-xs uppercase tracking-[0.2em] text-[var(--muted)] mb-2 block">What are you building?</label>
+        <select class="input" name="service">
+          <option>A new website</option>
+          <option>Brand identity</option>
+          <option>Social automation &amp; AI agents</option>
+          <option>The full package</option>
+          <option>Not sure yet — let's talk</option>
+        </select>
+      </div>
+      <div class="md:col-span-2">
+        <label class="text-xs uppercase tracking-[0.2em] text-[var(--muted)] mb-2 block">Tell us about it</label>
+        <textarea class="input" name="message" rows="4" placeholder="A few sentences on your business and what you're hoping to do..." required></textarea>
+      </div>
+      <div class="md:col-span-2 flex flex-wrap items-center justify-between gap-4 mt-2">
+        <p class="text-sm text-[var(--muted)]">Or email us directly: <a class="text-white underline-offset-4 hover:underline" href="mailto:hello@borealisdesign.org">hello@borealisdesign.org</a></p>
+        <button type="submit" class="btn-primary magnetic">
+          Send it
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </div>
+    </form>
+  </div>
+</section>
+
+<!-- ========== FOOTER ========== -->
+<footer class="relative px-6 md:px-10 py-16 border-t border-white/5">
+  <div class="max-w-7xl mx-auto grid md:grid-cols-12 gap-10">
+    <div class="md:col-span-5">
+      <div class="flex items-center gap-3 mb-6">
+        <span class="relative w-9 h-9 grid place-items-center">
+          <span class="absolute inset-0 rounded-xl" style="background: conic-gradient(from 0deg, var(--aurora-1), var(--aurora-2), var(--aurora-3), var(--aurora-4), var(--aurora-1)); filter: blur(8px); opacity: 0.7;"></span>
+          <span class="absolute inset-[3px] rounded-[10px] bg-[var(--bg)]"></span>
+          <svg class="relative" width="18" height="18" viewBox="0 0 24 24" fill="none">
+            <path d="M3 18 Q6 6 12 12 T 21 6" stroke="white" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </span>
+        <span class="font-semibold tracking-tight text-[17px]">Borealis Design</span>
+      </div>
+      <p class="text-[var(--muted)] max-w-sm leading-relaxed">
+        A small studio crafting websites, brands, and autonomous AI systems for businesses that won't blend in.
+      </p>
+    </div>
+
+    <div class="md:col-span-2">
+      <h4 class="text-xs uppercase tracking-[0.2em] text-[var(--muted)] mb-4">Studio</h4>
+      <ul class="space-y-3 text-sm">
+        <li><a href="#services" class="hover:text-white transition">Services</a></li>
+        <li><a href="#process" class="hover:text-white transition">Process</a></li>
+        <li><a href="#work" class="hover:text-white transition">Work</a></li>
+        <li><a href="#contact" class="hover:text-white transition">Contact</a></li>
+      </ul>
+    </div>
+
+    <div class="md:col-span-2">
+      <h4 class="text-xs uppercase tracking-[0.2em] text-[var(--muted)] mb-4">Connect</h4>
+      <ul class="space-y-3 text-sm">
+        <li><a href="#" class="hover:text-white transition">Instagram</a></li>
+        <li><a href="#" class="hover:text-white transition">LinkedIn</a></li>
+        <li><a href="#" class="hover:text-white transition">X / Twitter</a></li>
+        <li><a href="mailto:hello@borealisdesign.org" class="hover:text-white transition">Email</a></li>
+      </ul>
+    </div>
+
+    <div class="md:col-span-3">
+      <h4 class="text-xs uppercase tracking-[0.2em] text-[var(--muted)] mb-4">Studio status</h4>
+      <div class="flex items-center gap-2 mb-3">
+        <span class="w-2 h-2 rounded-full" style="background: var(--aurora-6); box-shadow: 0 0 12px var(--aurora-6);"></span>
+        <span class="text-sm">Booking projects for Q3 2026</span>
+      </div>
+      <p class="text-xs text-[var(--muted)] leading-relaxed">
+        Two project slots open. Reach out before they close.
+      </p>
+    </div>
+  </div>
+
+  <div class="max-w-7xl mx-auto mt-16 pt-8 border-t border-white/5 flex flex-wrap items-center justify-between gap-4 text-xs text-[var(--muted)]">
+    <span>© 2026 Borealis Design. All rights reserved.</span>
+    <span>Designed &amp; built in-house.</span>
+  </div>
+</footer>
+
+<script>
+  // ===== Tailwind config (extend if needed) =====
+  tailwind.config = { theme: { extend: {} } };
+
+  // ===== GSAP setup =====
+  gsap.registerPlugin(ScrollTrigger);
+
+  // ===== Nav scroll effect =====
+  const nav = document.getElementById('nav');
+  ScrollTrigger.create({
+    start: 'top -20',
+    end: 99999,
+    onUpdate: (self) => {
+      if (self.scroll() > 20) nav.classList.add('scrolled');
+      else nav.classList.remove('scrolled');
+    }
+  });
+
+  // ===== Hero entrance animation =====
+  gsap.to('[data-stagger]', {
+    opacity: 1,
+    y: 0,
+    duration: 1.1,
+    ease: 'power3.out',
+    stagger: 0.12,
+    delay: 0.2,
+  });
+
+  // ===== Reveal on scroll =====
+  gsap.utils.toArray('.reveal').forEach((el) => {
+    if (el.hasAttribute('data-stagger')) return; // hero handled separately
+    gsap.to(el, {
+      opacity: 1,
+      y: 0,
+      duration: 1,
+      ease: 'power3.out',
+      scrollTrigger: {
+        trigger: el,
+        start: 'top 88%',
+        toggleActions: 'play none none reverse',
+      },
+    });
+  });
+
+  // ===== Process timeline draw =====
+  const path = document.getElementById('processPath');
+  if (path) {
+    gsap.set(path, { strokeDasharray: 1, strokeDashoffset: 1 });
+    gsap.to(path, {
+      strokeDashoffset: 0,
+      ease: 'none',
+      scrollTrigger: {
+        trigger: '#processTrack',
+        start: 'top 70%',
+        end: 'bottom 60%',
+        scrub: 1,
+      },
+    });
+  }
+
+  // ===== Magnetic buttons =====
+  document.querySelectorAll('.magnetic').forEach((btn) => {
+    btn.addEventListener('mousemove', (e) => {
+      const rect = btn.getBoundingClientRect();
+      const x = e.clientX - rect.left - rect.width / 2;
+      const y = e.clientY - rect.top - rect.height / 2;
+      gsap.to(btn, { x: x * 0.25, y: y * 0.4, duration: 0.5, ease: 'power3.out' });
+    });
+    btn.addEventListener('mouseleave', () => {
+      gsap.to(btn, { x: 0, y: 0, duration: 0.6, ease: 'elastic.out(1, 0.5)' });
+    });
+  });
+
+  // ===== Cursor halo =====
+  const halo = document.getElementById('cursorHalo');
+  let mouseX = 0, mouseY = 0, haloX = 0, haloY = 0;
+  window.addEventListener('mousemove', (e) => {
+    mouseX = e.clientX; mouseY = e.clientY;
+  });
+  function animateHalo() {
+    haloX += (mouseX - haloX) * 0.08;
+    haloY += (mouseY - haloY) * 0.08;
+    halo.style.transform = `translate(${haloX}px, ${haloY}px) translate(-50%, -50%)`;
+    requestAnimationFrame(animateHalo);
+  }
+  animateHalo();
+
+  // ===== Parallax aurora blobs in hero =====
+  gsap.utils.toArray('.aurora-blob').forEach((blob, i) => {
+    gsap.to(blob, {
+      yPercent: -30 - i * 10,
+      ease: 'none',
+      scrollTrigger: {
+        trigger: blob.closest('section'),
+        start: 'top top',
+        end: 'bottom top',
+        scrub: 1.2,
+      },
+    });
+  });
+
+  // ===== Form submit (mailto fallback) =====
+  function handleSubmit(e) {
+    e.preventDefault();
+    const f = e.target;
+    const subject = encodeURIComponent(`New inquiry: ${f.service.value}`);
+    const body = encodeURIComponent(
+      `Name: ${f.name.value}\nEmail: ${f.email.value}\nService: ${f.service.value}\n\n${f.message.value}`
+    );
+    window.location.href = `mailto:hello@borealisdesign.org?subject=${subject}&body=${body}`;
+  }
+
+  // ===== Mobile menu (basic anchor scroll already works; menu button reserved) =====
+  const menuBtn = document.getElementById('menuBtn');
+  if (menuBtn) {
+    menuBtn.addEventListener('click', () => {
+      const links = document.querySelector('nav .hidden.md\\:flex');
+      // Simple toggle for demo
+      alert('Mobile menu: simplified for v1 — full overlay nav can be added next.');
+    });
+  }
+</script>
+
+</body>
+</html>
