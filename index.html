@@ -352,6 +352,7 @@
   }
 
   /* ========== Form (liquid glass) ========== */
+  :root { color-scheme: dark; }
   .input {
     width: 100%;
     padding: 16px 20px;
@@ -367,7 +368,25 @@
     color: var(--fg);
     font-family: inherit;
     font-size: 16px;
+    color-scheme: dark;
     transition: border-color 0.3s ease, background 0.3s ease, box-shadow 0.3s ease;
+  }
+  /* Native select dropdown — force readable dark options across browsers */
+  select.input {
+    appearance: none;
+    -webkit-appearance: none;
+    background-image:
+      linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.015)),
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8' fill='none'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%239b97b3' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat, no-repeat;
+    background-position: 0 0, right 18px center;
+    background-size: 100% 100%, 12px 8px;
+    padding-right: 44px;
+  }
+  select.input option {
+    background-color: #14112a;
+    color: #f5f3ff;
+    padding: 12px;
   }
   .input:focus {
     outline: none;
@@ -1096,7 +1115,7 @@
     <form class="reveal glass-card p-8 md:p-12 grid md:grid-cols-2 gap-5" onsubmit="handleSubmit(event)">
       <div>
         <label class="text-xs uppercase tracking-[0.2em] text-[var(--muted)] mb-2 block">Your name</label>
-        <input class="input" type="text" name="name" placeholder="Jane Cunningham" required />
+        <input class="input" type="text" name="name" placeholder="Sabrina Carpenter" required />
       </div>
       <div>
         <label class="text-xs uppercase tracking-[0.2em] text-[var(--muted)] mb-2 block">Email</label>
@@ -1117,7 +1136,7 @@
         <textarea class="input" name="message" rows="4" placeholder="A few sentences on your business and what you're hoping to do..." required></textarea>
       </div>
       <div class="md:col-span-2 flex flex-wrap items-center justify-between gap-4 mt-2">
-        <p class="text-sm text-[var(--muted)]">Or email us directly: <a class="text-white underline-offset-4 hover:underline" href="mailto:hello@borealisdesign.org">hello@borealisdesign.org</a></p>
+        <p class="text-sm text-[var(--muted)]">Or email us directly: <a class="text-white underline-offset-4 hover:underline" href="mailto:openclaudeconsulting@gmail.com">openclaudeconsulting@gmail.com</a></p>
         <button type="submit" class="btn-primary magnetic">
           Send it
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -1162,7 +1181,7 @@
         <li><a href="#" class="hover:text-white transition">Instagram</a></li>
         <li><a href="#" class="hover:text-white transition">LinkedIn</a></li>
         <li><a href="#" class="hover:text-white transition">X / Twitter</a></li>
-        <li><a href="mailto:hello@borealisdesign.org" class="hover:text-white transition">Email</a></li>
+        <li><a href="mailto:openclaudeconsulting@gmail.com" class="hover:text-white transition">Email</a></li>
       </ul>
     </div>
 
@@ -1337,7 +1356,7 @@
     const body = encodeURIComponent(
       `Name: ${f.name.value}\nEmail: ${f.email.value}\nService: ${f.service.value}\n\n${f.message.value}`
     );
-    window.location.href = `mailto:hello@borealisdesign.org?subject=${subject}&body=${body}`;
+    window.location.href = `mailto:openclaudeconsulting@gmail.com?subject=${subject}&body=${body}`;
   }
 
   // ===== Mobile menu (basic anchor scroll already works; menu button reserved) =====
