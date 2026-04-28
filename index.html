@@ -388,6 +388,129 @@
     color: #f5f3ff;
     padding: 12px;
   }
+
+  /* ========== Form: section dividers, choice cards, status ========== */
+  .form-divider {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding-top: 12px;
+  }
+  .form-divider:first-child { padding-top: 0; }
+  .form-divider .form-section-num {
+    font-family: 'Instrument Serif', serif;
+    font-style: italic;
+    font-size: 22px;
+    line-height: 1;
+    background: linear-gradient(120deg, var(--aurora-1), var(--aurora-2), var(--aurora-3), var(--aurora-4));
+    background-size: 300% 300%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: gradient 9s ease infinite;
+  }
+  .form-divider .form-section-title {
+    font-size: 11px;
+    letter-spacing: 0.32em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.78);
+  }
+  .form-divider .form-section-line {
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, rgba(255,255,255,0.18), transparent);
+  }
+
+  .form-label {
+    display: block;
+    font-size: 11px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.55);
+    margin-bottom: 8px;
+  }
+
+  .choice-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .choice-card {
+    position: relative;
+    flex: 1 1 auto;
+    min-width: 140px;
+    padding: 14px 18px;
+    border-radius: 14px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.012));
+    backdrop-filter: blur(14px) saturate(180%);
+    -webkit-backdrop-filter: blur(14px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    box-shadow:
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.12),
+      inset 0 -1px 0 0 rgba(0, 0, 0, 0.18),
+      0 4px 12px -4px rgba(0, 0, 0, 0.25);
+    color: rgba(255, 255, 255, 0.85);
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    user-select: none;
+  }
+  .choice-card input { position: absolute; opacity: 0; pointer-events: none; }
+  .choice-card:hover {
+    border-color: rgba(255, 255, 255, 0.20);
+    background: linear-gradient(180deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02));
+  }
+  .choice-card:has(input:checked) {
+    border-color: rgba(168, 85, 247, 0.55);
+    background: linear-gradient(180deg, rgba(168, 85, 247, 0.18), rgba(79, 124, 255, 0.08));
+    box-shadow:
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.20),
+      inset 0 -1px 0 0 rgba(0, 0, 0, 0.18),
+      0 0 0 2px rgba(168, 85, 247, 0.18),
+      0 8px 24px -4px rgba(168, 85, 247, 0.30);
+    color: white;
+  }
+  .choice-card:has(input:checked)::after {
+    content: '';
+    position: absolute;
+    top: 12px; right: 12px;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--aurora-2);
+    box-shadow: 0 0 10px rgba(168, 85, 247, 0.8);
+  }
+  .choice-card:has(input:checked)::before {
+    content: '';
+    position: absolute;
+    top: 17px; right: 17px;
+    width: 4px; height: 4px;
+    border-radius: 50%;
+    background: white;
+    z-index: 1;
+  }
+
+  .form-status {
+    grid-column: 1 / -1;
+    padding: 18px 22px;
+    border-radius: 16px;
+    font-size: 14px;
+    line-height: 1.5;
+    display: none;
+  }
+  .form-status.is-success {
+    display: block;
+    background: linear-gradient(180deg, rgba(52, 211, 153, 0.16), rgba(52, 211, 153, 0.04));
+    border: 1px solid rgba(52, 211, 153, 0.4);
+    color: #d1fae5;
+  }
+  .form-status.is-error {
+    display: block;
+    background: linear-gradient(180deg, rgba(255, 77, 141, 0.16), rgba(255, 77, 141, 0.04));
+    border: 1px solid rgba(255, 77, 141, 0.4);
+    color: #fce7f3;
+  }
+  .form-status a { color: white; text-decoration: underline; text-underline-offset: 3px; }
   .input:focus {
     outline: none;
     border-color: rgba(168, 85, 247, 0.55);
@@ -1112,33 +1235,161 @@
       </p>
     </div>
 
-    <form class="reveal glass-card p-8 md:p-12 grid md:grid-cols-2 gap-5" onsubmit="handleSubmit(event)">
+    <form id="quoteForm" class="reveal glass-card p-8 md:p-12 grid md:grid-cols-2 gap-5">
+      <!-- FormSubmit metadata (hidden) -->
+      <input type="hidden" name="_subject" value="New quote inquiry — Borealis Design" />
+      <input type="hidden" name="_template" value="table" />
+      <input type="hidden" name="_captcha" value="false" />
+      <!-- Honeypot for spam bots -->
+      <input type="text" name="_honey" tabindex="-1" autocomplete="off" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0" />
+
+      <!-- ===== About you ===== -->
+      <div class="form-divider">
+        <span class="form-section-num">01</span>
+        <span class="form-section-title">About you</span>
+        <span class="form-section-line"></span>
+      </div>
+
       <div>
-        <label class="text-xs uppercase tracking-[0.2em] text-[var(--muted)] mb-2 block">Your name</label>
+        <label class="form-label">Full name</label>
         <input class="input" type="text" name="name" placeholder="Sabrina Carpenter" required />
       </div>
       <div>
-        <label class="text-xs uppercase tracking-[0.2em] text-[var(--muted)] mb-2 block">Email</label>
+        <label class="form-label">Email</label>
         <input class="input" type="email" name="email" placeholder="Sabrina@company.com" required />
       </div>
+      <div>
+        <label class="form-label">Phone (optional)</label>
+        <input class="input" type="tel" name="phone" placeholder="(555) 123-4567" />
+      </div>
+      <div>
+        <label class="form-label">Company name</label>
+        <input class="input" type="text" name="company" placeholder="Your business" required />
+      </div>
+
+      <!-- ===== About the business ===== -->
+      <div class="form-divider">
+        <span class="form-section-num">02</span>
+        <span class="form-section-title">About the business</span>
+        <span class="form-section-line"></span>
+      </div>
+
       <div class="md:col-span-2">
-        <label class="text-xs uppercase tracking-[0.2em] text-[var(--muted)] mb-2 block">What are you building?</label>
-        <select class="input" name="service">
-          <option>A new website</option>
-          <option>Brand identity</option>
-          <option>Social automation &amp; AI agents</option>
-          <option>The full package</option>
-          <option>Not sure yet — let's talk</option>
+        <label class="form-label">Is this a new or existing business?</label>
+        <div class="choice-group">
+          <label class="choice-card">
+            <input type="radio" name="business_status" value="New — just starting" required />
+            <span>New — just starting</span>
+          </label>
+          <label class="choice-card">
+            <input type="radio" name="business_status" value="Existing — already operating" />
+            <span>Existing — already operating</span>
+          </label>
+          <label class="choice-card">
+            <input type="radio" name="business_status" value="Rebrand / pivot" />
+            <span>Rebrand / pivot</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="md:col-span-2">
+        <label class="form-label">Tell us about your business</label>
+        <textarea class="input" name="business_description" rows="3" placeholder="What you do, who you serve, what makes you different..." required></textarea>
+      </div>
+
+      <div class="md:col-span-2">
+        <label class="form-label">Existing website (if any)</label>
+        <input class="input" type="url" name="existing_website" placeholder="https://..." />
+      </div>
+
+      <!-- ===== What you need ===== -->
+      <div class="form-divider">
+        <span class="form-section-num">03</span>
+        <span class="form-section-title">What you need</span>
+        <span class="form-section-line"></span>
+      </div>
+
+      <div class="md:col-span-2">
+        <label class="form-label">Services (select all that apply)</label>
+        <div class="choice-group">
+          <label class="choice-card"><input type="checkbox" name="services" value="New website" /><span>New website</span></label>
+          <label class="choice-card"><input type="checkbox" name="services" value="Brand identity" /><span>Brand identity</span></label>
+          <label class="choice-card"><input type="checkbox" name="services" value="Social management" /><span>Social management</span></label>
+          <label class="choice-card"><input type="checkbox" name="services" value="AI automation" /><span>AI automation</span></label>
+          <label class="choice-card"><input type="checkbox" name="services" value="Brand voice / copy" /><span>Brand voice / copy</span></label>
+          <label class="choice-card"><input type="checkbox" name="services" value="Not sure yet" /><span>Not sure yet</span></label>
+        </div>
+      </div>
+
+      <div class="md:col-span-2">
+        <label class="form-label">Do you already have brand assets (logo, slogan, colors)?</label>
+        <div class="choice-group">
+          <label class="choice-card"><input type="radio" name="brand_assets" value="Yes — full brand system" required /><span>Yes — full brand system</span></label>
+          <label class="choice-card"><input type="radio" name="brand_assets" value="Some — partial" /><span>Some — partial</span></label>
+          <label class="choice-card"><input type="radio" name="brand_assets" value="No — starting fresh" /><span>No — starting fresh</span></label>
+        </div>
+      </div>
+
+      <!-- ===== Timeline & scope ===== -->
+      <div class="form-divider">
+        <span class="form-section-num">04</span>
+        <span class="form-section-title">Timeline &amp; scope</span>
+        <span class="form-section-line"></span>
+      </div>
+
+      <div>
+        <label class="form-label">Target completion</label>
+        <select class="input" name="timeline" required>
+          <option value="">Select...</option>
+          <option>ASAP — within 1 month</option>
+          <option>1–2 months</option>
+          <option>2–3 months</option>
+          <option>3–6 months</option>
+          <option>Flexible — no rush</option>
+        </select>
+      </div>
+      <div>
+        <label class="form-label">Budget range (optional)</label>
+        <select class="input" name="budget">
+          <option value="">Select...</option>
+          <option>Under $2K</option>
+          <option>$2K – $5K</option>
+          <option>$5K – $10K</option>
+          <option>$10K – $25K</option>
+          <option>$25K+</option>
+          <option>Open to discuss</option>
         </select>
       </div>
       <div class="md:col-span-2">
-        <label class="text-xs uppercase tracking-[0.2em] text-[var(--muted)] mb-2 block">Tell us about it</label>
-        <textarea class="input" name="message" rows="4" placeholder="A few sentences on your business and what you're hoping to do..." required></textarea>
+        <label class="form-label">Hard deadline? (optional)</label>
+        <input class="input" type="text" name="hard_deadline" placeholder="e.g. Launch event on June 15 — must be live by then" />
       </div>
+
+      <!-- ===== Vision ===== -->
+      <div class="form-divider">
+        <span class="form-section-num">05</span>
+        <span class="form-section-title">Your vision</span>
+        <span class="form-section-line"></span>
+      </div>
+
+      <div class="md:col-span-2">
+        <label class="form-label">What does success look like for this project?</label>
+        <textarea class="input" name="vision" rows="3" placeholder="Goals, vibe, sites you admire, anything that helps us understand the outcome you're after..." required></textarea>
+      </div>
+
+      <div class="md:col-span-2">
+        <label class="form-label">Anything else? (optional)</label>
+        <textarea class="input" name="additional_notes" rows="2" placeholder="Constraints, concerns, fun facts..."></textarea>
+      </div>
+
+      <!-- Status banner (shown after submit) -->
+      <div id="formStatus" class="form-status" role="status" aria-live="polite"></div>
+
+      <!-- Submit -->
       <div class="md:col-span-2 flex flex-wrap items-center justify-between gap-4 mt-2">
         <p class="text-sm text-[var(--muted)]">Or email us directly: <a class="text-white underline-offset-4 hover:underline" href="mailto:openclaudeconsulting@gmail.com">openclaudeconsulting@gmail.com</a></p>
-        <button type="submit" class="btn-primary magnetic">
-          Send it
+        <button type="submit" class="btn-primary magnetic" id="quoteSubmit">
+          Send inquiry
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </button>
       </div>
@@ -1348,15 +1599,52 @@
     });
   });
 
-  // ===== Form submit (mailto fallback) =====
-  function handleSubmit(e) {
-    e.preventDefault();
-    const f = e.target;
-    const subject = encodeURIComponent(`New inquiry: ${f.service.value}`);
-    const body = encodeURIComponent(
-      `Name: ${f.name.value}\nEmail: ${f.email.value}\nService: ${f.service.value}\n\n${f.message.value}`
-    );
-    window.location.href = `mailto:openclaudeconsulting@gmail.com?subject=${subject}&body=${body}`;
+  // ===== Quote form — submit via FormSubmit.co AJAX =====
+  const quoteForm = document.getElementById('quoteForm');
+  const quoteStatus = document.getElementById('formStatus');
+  const quoteSubmit = document.getElementById('quoteSubmit');
+
+  if (quoteForm) {
+    quoteForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      // Spam honeypot — bots fill it, humans don't
+      if (quoteForm.querySelector('[name="_honey"]').value) return;
+
+      const originalBtn = quoteSubmit.innerHTML;
+      quoteSubmit.disabled = true;
+      quoteSubmit.style.opacity = '0.7';
+      quoteSubmit.innerHTML = 'Sending…';
+      quoteStatus.className = 'form-status';
+      quoteStatus.textContent = '';
+
+      const formData = new FormData(quoteForm);
+
+      try {
+        const res = await fetch('https://formsubmit.co/ajax/openclaudeconsulting@gmail.com', {
+          method: 'POST',
+          headers: { 'Accept': 'application/json' },
+          body: formData,
+        });
+        const data = await res.json();
+
+        if (data.success === 'true' || data.success === true) {
+          quoteStatus.className = 'form-status is-success';
+          quoteStatus.innerHTML = '✓ Thanks — we got your inquiry. We\'ll respond within one business day.';
+          quoteForm.reset();
+          quoteStatus.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        } else {
+          throw new Error(data.message || 'Submission failed');
+        }
+      } catch (err) {
+        quoteStatus.className = 'form-status is-error';
+        quoteStatus.innerHTML = 'Something went wrong sending your inquiry. You can email us directly at <a href="mailto:openclaudeconsulting@gmail.com">openclaudeconsulting@gmail.com</a> and we\'ll respond right away.';
+      } finally {
+        quoteSubmit.disabled = false;
+        quoteSubmit.style.opacity = '';
+        quoteSubmit.innerHTML = originalBtn;
+      }
+    });
   }
 
   // ===== Mobile menu (basic anchor scroll already works; menu button reserved) =====
