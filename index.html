@@ -1236,10 +1236,8 @@
     </div>
 
     <form id="quoteForm" class="reveal glass-card p-8 md:p-12 grid md:grid-cols-2 gap-5">
-      <!-- FormSubmit metadata (hidden) -->
+      <!-- Subject line for the inbound email -->
       <input type="hidden" name="_subject" value="New quote inquiry — Borealis Design" />
-      <input type="hidden" name="_template" value="table" />
-      <input type="hidden" name="_captcha" value="false" />
       <!-- Honeypot for spam bots -->
       <input type="text" name="_honey" tabindex="-1" autocomplete="off" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0" />
 
@@ -1599,8 +1597,13 @@
     });
   });
 
-  // ===== Quote form — submit via FormSubmit.co AJAX =====
-  const quoteForm = document.getElementById('quoteForm');
+  // ===== Quote form — submit via Google Apps Script web app =====
+  // Paste the deployment URL from your Apps Script web app here.
+  // (Deploy → New deployment → Web app → Anyone → copy the /exec URL)
+  // See apps-script.gs in the repo for the script code + setup instructions.
+  const APPS_SCRIPT_URL = 'PASTE_YOUR_APPS_SCRIPT_DEPLOYMENT_URL_HERE';
+
+  const quoteForm   = document.getElementById('quoteForm');
   const quoteStatus = document.getElementById('formStatus');
   const quoteSubmit = document.getElementById('quoteSubmit');
 
@@ -1621,20 +1624,21 @@
       const formData = new FormData(quoteForm);
 
       try {
-        const res = await fetch('https://formsubmit.co/ajax/openclaudeconsulting@gmail.com', {
+        // Apps Script returns CORS headers when deployed as "Anyone".
+        // FormData is sent as multipart/form-data; doPost reads it via e.parameter.
+        const res = await fetch(APPS_SCRIPT_URL, {
           method: 'POST',
-          headers: { 'Accept': 'application/json' },
           body: formData,
         });
         const data = await res.json();
 
-        if (data.success === 'true' || data.success === true) {
+        if (data && data.success) {
           quoteStatus.className = 'form-status is-success';
           quoteStatus.innerHTML = '✓ Thanks — we got your inquiry. We\'ll respond within one business day.';
           quoteForm.reset();
           quoteStatus.scrollIntoView({ behavior: 'smooth', block: 'center' });
         } else {
-          throw new Error(data.message || 'Submission failed');
+          throw new Error((data && data.error) || 'Submission failed');
         }
       } catch (err) {
         quoteStatus.className = 'form-status is-error';
