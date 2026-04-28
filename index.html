@@ -381,29 +381,76 @@
   }
   .input::placeholder { color: var(--muted); }
 
-  /* ========== Pills (liquid glass) ========== */
-  .pill {
-    position: relative;
+  /* ========== Section index marks (replaces pills) ========== */
+  .mark {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
-    padding: 7px 14px;
-    border-radius: 999px;
-    background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02));
-    backdrop-filter: blur(14px) saturate(180%);
-    -webkit-backdrop-filter: blur(14px) saturate(180%);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    box-shadow:
-      inset 0 1px 0 0 rgba(255, 255, 255, 0.18),
-      inset 0 -1px 0 0 rgba(0, 0, 0, 0.16),
-      0 4px 12px -4px rgba(0, 0, 0, 0.30);
-    font-size: 13px;
-    color: rgba(255, 255, 255, 0.85);
+    gap: 16px;
+    font-size: 11px;
+    letter-spacing: 0.32em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.62);
   }
-  .pill .dot {
-    width: 6px; height: 6px; border-radius: 50%;
+  .mark-num {
+    font-family: 'Instrument Serif', 'Times New Roman', serif;
+    font-style: italic;
+    font-size: 30px;
+    line-height: 1;
+    letter-spacing: 0;
+    text-transform: none;
+    background: linear-gradient(120deg, var(--aurora-1), var(--aurora-2), var(--aurora-3), var(--aurora-4), var(--aurora-1));
+    background-size: 300% 300%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: gradient 9s ease infinite;
+    transform: translateY(1px);
+  }
+  .mark-line {
+    display: inline-block;
+    width: 42px;
+    height: 1px;
+    background: linear-gradient(90deg, var(--aurora-2), var(--aurora-3), var(--aurora-4));
+    transform-origin: left center;
+    transform: scaleX(0);
+    transition: transform 0.9s cubic-bezier(0.2, 0.9, 0.3, 1) 0.15s;
+    box-shadow: 0 0 6px rgba(168, 85, 247, 0.55);
+  }
+  .mark-label {
+    color: rgba(255, 255, 255, 0.78);
+    transition: color 0.4s ease;
+  }
+  .mark.mark-in .mark-line { transform: scaleX(1); }
+
+  /* ========== Status indicator (hero) ========== */
+  .status {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 11px;
+    letter-spacing: 0.32em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.78);
+  }
+  .status-dot {
+    position: relative;
+    width: 7px; height: 7px;
+    border-radius: 50%;
     background: var(--aurora-6);
-    box-shadow: 0 0 10px var(--aurora-6);
+    box-shadow: 0 0 10px var(--aurora-6), 0 0 22px rgba(52, 211, 153, 0.6);
+  }
+  .status-dot::after {
+    content: '';
+    position: absolute;
+    inset: -3px;
+    border-radius: 50%;
+    background: var(--aurora-6);
+    opacity: 0.5;
+    animation: status-pulse 2.2s ease-out infinite;
+  }
+  @keyframes status-pulse {
+    0%   { transform: scale(0.7); opacity: 0.55; }
+    100% { transform: scale(2.6); opacity: 0;    }
   }
 
   /* ========== Logo frame (portfolio card backdrop) ========== */
@@ -565,9 +612,9 @@
   <div class="noise"></div>
 
   <div class="relative z-10 max-w-7xl mx-auto w-full">
-    <div class="reveal pill mb-8" data-stagger="0">
-      <span class="dot"></span>
-      <span>Now booking projects for Q3 2026</span>
+    <div class="reveal status mb-8" data-stagger="0">
+      <span class="status-dot"></span>
+      <span>Now booking · Q3 2026</span>
     </div>
 
     <h1 class="reveal text-[clamp(3rem,9vw,8.5rem)] leading-[0.95] font-semibold tracking-[-0.04em] max-w-6xl" data-stagger="1">
@@ -577,7 +624,7 @@
 
     <p class="reveal mt-10 text-lg md:text-xl hero-sub max-w-2xl leading-relaxed" data-stagger="2">
       Borealis is a small studio crafting websites, brands, and autonomous AI systems
-      for the businesses that won't blend in.
+      for the businesses that want to stand out.
     </p>
 
     <div class="reveal mt-12 flex flex-wrap gap-4 items-center" data-stagger="3">
@@ -626,7 +673,11 @@
   <div class="max-w-7xl mx-auto">
     <div class="grid md:grid-cols-12 gap-10 mb-20 items-end">
       <div class="md:col-span-7">
-        <p class="reveal pill mb-6"><span class="dot"></span> What we do</p>
+        <div class="reveal mark mb-6">
+          <span class="mark-num">01</span>
+          <span class="mark-line"></span>
+          <span class="mark-label">What we do</span>
+        </div>
         <h2 class="reveal text-[clamp(2.5rem,6vw,5rem)] leading-[1] font-semibold tracking-[-0.03em]">
           Four pillars.<br />
           <span class="serif italic aurora-text">One studio.</span>
@@ -729,7 +780,11 @@
   <div class="relative max-w-7xl mx-auto">
     <div class="grid md:grid-cols-12 gap-12 items-center">
       <div class="md:col-span-6">
-        <p class="reveal pill mb-6"><span class="dot"></span> The differentiator</p>
+        <div class="reveal mark mb-6">
+          <span class="mark-num">02</span>
+          <span class="mark-line"></span>
+          <span class="mark-label">The differentiator</span>
+        </div>
         <h2 class="reveal text-[clamp(2.2rem,5vw,4.2rem)] leading-[1.05] font-semibold tracking-[-0.03em] mb-6">
           We don't <span class="serif italic text-[var(--muted)]">just build</span> your presence.<br />
           We give it a <span class="aurora-text">pulse</span>.
@@ -827,7 +882,11 @@
   <div class="max-w-7xl mx-auto">
     <div class="grid md:grid-cols-12 gap-10 mb-24 items-end">
       <div class="md:col-span-7">
-        <p class="reveal pill mb-6"><span class="dot"></span> How we work</p>
+        <div class="reveal mark mb-6">
+          <span class="mark-num">03</span>
+          <span class="mark-line"></span>
+          <span class="mark-label">How we work</span>
+        </div>
         <h2 class="reveal text-[clamp(2.5rem,6vw,5rem)] leading-[1] font-semibold tracking-[-0.03em]">
           The <span class="serif italic">process</span>,<br />
           drawn out.
@@ -891,7 +950,11 @@
   <div class="max-w-7xl mx-auto">
     <div class="grid md:grid-cols-12 gap-10 mb-20 items-end">
       <div class="md:col-span-7">
-        <p class="reveal pill mb-6"><span class="dot"></span> Selected work</p>
+        <div class="reveal mark mb-6">
+          <span class="mark-num">04</span>
+          <span class="mark-line"></span>
+          <span class="mark-label">Selected work</span>
+        </div>
         <h2 class="reveal text-[clamp(2.5rem,6vw,5rem)] leading-[1] font-semibold tracking-[-0.03em]">
           A small <span class="serif italic">portfolio</span>,<br />
           made with <span class="aurora-text">care</span>.
@@ -982,7 +1045,13 @@
     <div class="aurora-blob b4" style="bottom: 0; right: 0;"></div>
   </div>
   <div class="relative max-w-5xl mx-auto text-center">
-    <p class="reveal pill mb-8 mx-auto"><span class="dot"></span> Philosophy</p>
+    <div class="reveal mb-8 flex justify-center">
+      <div class="mark">
+        <span class="mark-num">05</span>
+        <span class="mark-line"></span>
+        <span class="mark-label">Philosophy</span>
+      </div>
+    </div>
     <h2 class="reveal text-[clamp(2rem,5vw,4rem)] leading-[1.15] font-medium tracking-[-0.02em]">
       <span class="serif italic">"</span>The best brands feel like a <span class="aurora-text">place</span> —<br />
       somewhere you actually want to spend time.<span class="serif italic">"</span>
@@ -1008,7 +1077,13 @@
 
   <div class="relative max-w-5xl mx-auto">
     <div class="text-center mb-16">
-      <p class="reveal pill mb-6 mx-auto"><span class="dot"></span> Let's begin</p>
+      <div class="reveal mb-6 flex justify-center">
+        <div class="mark">
+          <span class="mark-num">06</span>
+          <span class="mark-line"></span>
+          <span class="mark-label">Let's begin</span>
+        </div>
+      </div>
       <h2 class="reveal text-[clamp(2.5rem,7vw,6rem)] leading-[0.95] font-semibold tracking-[-0.03em]">
         Build something<br />
         <span class="serif italic aurora-text">memorable</span>.
@@ -1180,6 +1255,23 @@
       },
     });
   }
+
+  // ===== Section marks — draw hairline on scroll-in =====
+  gsap.utils.toArray('.mark').forEach((el) => {
+    ScrollTrigger.create({
+      trigger: el,
+      start: 'top 90%',
+      onEnter: () => el.classList.add('mark-in'),
+      onLeaveBack: () => el.classList.remove('mark-in'),
+    });
+  });
+  // Hero marks (above the fold) — show after entrance stagger
+  setTimeout(() => {
+    document.querySelectorAll('.status, .mark').forEach((el) => {
+      const r = el.getBoundingClientRect();
+      if (r.top < window.innerHeight && r.bottom > 0) el.classList.add('mark-in');
+    });
+  }, 800);
 
   // ===== Liquid glass — cursor-tracking sheen =====
   document.querySelectorAll('.glass-card').forEach((el) => {
