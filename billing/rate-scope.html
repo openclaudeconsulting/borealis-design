@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Borealis Design — Rate &amp; Scope Sheet</title>
+<link rel="stylesheet" href="fonts/embedded.css" />
+<style>
+  :root {
+    --ink:      #16132a;
+    --ink-soft: #3c3856;
+    --muted:    #6f6b86;
+    --faint:    #a5a1ba;
+    --line:     #e9e6f3;
+    --panel:    #faf9fe;
+    --a1: #ff4d8d; --a2: #a855f7; --a3: #4f7cff; --a4: #22d3ee;
+    --aurora: linear-gradient(120deg, #ff4d8d 0%, #a855f7 34%, #4f7cff 68%, #22d3ee 100%);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  @page { size: Letter; margin: 0; }
+  html, body { background: #fff; }
+  body {
+    font-family: 'Inter', system-ui, sans-serif; color: var(--ink);
+    -webkit-font-smoothing: antialiased; font-feature-settings: "cv11","ss01";
+    font-size: 10.5px; line-height: 1.5;
+  }
+  .serif { font-family: 'Instrument Serif', Georgia, serif; font-style: italic; font-weight: 400; }
+  .sheet {
+    position: relative; width: 8.5in; min-height: 11in; margin: 0 auto;
+    padding: 0.7in 0.72in 0.55in; background: #fff; overflow: hidden;
+  }
+  .sheet::before { content:""; position:absolute; top:0; left:0; right:0; height:8px; background: var(--aurora); }
+  .wash { position:absolute; top:-140px; right:-120px; width:420px; height:420px; border-radius:50%;
+          background: var(--aurora); filter: blur(90px); opacity:0.10; pointer-events:none; }
+
+  /* header */
+  .head { display:flex; justify-content:space-between; align-items:flex-start; margin-top:6px; }
+  .brand { display:flex; gap:12px; align-items:center; }
+  .mark { position:relative; width:42px; height:42px; border-radius:12px; background:var(--aurora); flex:none;
+          box-shadow:0 6px 18px -6px rgba(79,124,255,0.45); }
+  .mark svg { position:absolute; inset:0; margin:auto; }
+  .wordmark { font-size:19px; font-weight:700; letter-spacing:-0.02em; line-height:1; }
+  .wordmark span { color:var(--muted); font-weight:400; }
+  .tagline { font-size:9px; color:var(--muted); margin-top:4px; }
+  .doc-title { text-align:right; }
+  .doc-title h1 { font-family:'Instrument Serif',Georgia,serif; font-style:italic; font-weight:400;
+    font-size:34px; line-height:0.95; background:var(--aurora); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .doc-title .sub { font-size:9px; color:var(--muted); letter-spacing:0.14em; text-transform:uppercase; margin-top:6px; font-weight:600; }
+
+  .intro { margin-top:16px; font-size:11px; color:var(--ink-soft); max-width:6.2in; line-height:1.55; }
+
+  /* section */
+  .section { margin-top:17px; }
+  .snum {
+    display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; border-radius:6px;
+    background:var(--aurora); color:#fff; font-size:10px; font-weight:800; margin-right:9px; flex:none;
+  }
+  .stitle { display:flex; align-items:center; margin-bottom:11px; }
+  .stitle h2 { font-size:13px; font-weight:800; letter-spacing:0.02em; text-transform:uppercase; color:var(--ink); }
+  .stitle .bar { flex:1; height:1px; background:var(--line); margin-left:12px; }
+
+  /* rate cards */
+  .rates { display:flex; gap:14px; }
+  .rate { flex:1; border:1px solid var(--line); border-radius:14px; padding:15px 17px; position:relative; overflow:hidden; background:var(--panel); }
+  .rate::after { content:""; position:absolute; left:0; top:0; bottom:0; width:4px; background:var(--aurora); }
+  .rate .lbl { font-size:8.5px; font-weight:700; letter-spacing:0.15em; text-transform:uppercase; color:var(--a2); }
+  .rate .amt { font-size:26px; font-weight:800; letter-spacing:-0.02em; margin-top:5px; }
+  .rate .amt .unit { font-size:12px; font-weight:600; color:var(--muted); }
+  .rate .note { font-size:9.5px; color:var(--muted); margin-top:3px; }
+
+  /* how it works */
+  .work { display:flex; flex-direction:column; gap:11px; }
+  .witem { display:flex; gap:12px; align-items:flex-start; }
+  .wdot { width:9px; height:9px; border-radius:50%; margin-top:4px; flex:none; }
+  .witem:nth-child(1) .wdot { background:var(--a1); }
+  .witem:nth-child(2) .wdot { background:var(--a3); }
+  .witem:nth-child(3) .wdot { background:var(--a4); }
+  .witem .wh { font-size:11px; font-weight:700; color:var(--ink); }
+  .witem p { font-size:10px; color:var(--ink-soft); line-height:1.5; margin-top:1px; }
+
+  /* template */
+  .tmpl { border:1.5px dashed var(--line); border-radius:16px; padding:15px 20px; background:#fff; }
+  .tmpl .cap { font-size:8.5px; color:var(--faint); letter-spacing:0.14em; text-transform:uppercase; font-weight:600; margin-bottom:11px; }
+  .field { margin-bottom:9px; }
+  .field .fl { font-size:8.5px; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:var(--muted); margin-bottom:4px; }
+  .field .fline { border-bottom:1px solid var(--line); height:14px; }
+  .field .fbox { border:1px solid var(--line); border-radius:8px; height:34px; }
+  .frow { display:flex; gap:16px; }
+  .frow .field { flex:1; }
+  .schedule { display:flex; gap:10px; }
+  .schedule .seg { flex:1; background:var(--panel); border:1px solid var(--line); border-radius:9px; padding:8px 11px; }
+  .schedule .seg .pct { font-size:15px; font-weight:800; background:var(--aurora); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .schedule .seg .t { font-size:9px; color:var(--ink-soft); margin-top:1px; }
+  .fineprint { display:flex; justify-content:space-between; margin-top:8px; font-size:9px; color:var(--muted); }
+  .fineprint strong { color:var(--ink-soft); font-weight:600; }
+
+  /* retainer */
+  .retainer { margin-top:11px; background:var(--panel); border:1px solid var(--line); border-radius:12px;
+              padding:11px 16px; display:flex; align-items:center; gap:14px; }
+  .retainer .tag { font-size:8px; font-weight:800; letter-spacing:0.12em; text-transform:uppercase; color:#fff;
+                   background:var(--ink); padding:4px 9px; border-radius:6px; flex:none; }
+  .retainer .body { font-size:10.5px; color:var(--ink-soft); }
+  .retainer .body b { color:var(--ink); }
+  .fillblank { display:inline-block; min-width:38px; border-bottom:1.5px solid var(--a2); text-align:center; color:var(--muted); font-weight:600; }
+
+  /* footer */
+  .foot { position:absolute; left:0.72in; right:0.72in; bottom:0.5in; }
+  .foot .frule { height:1px; background:var(--line); margin-bottom:10px; }
+  .foot .fmeta { display:flex; justify-content:space-between; font-size:8.5px; color:var(--faint); letter-spacing:0.02em; }
+  .foot .fmeta a { color:var(--faint); text-decoration:none; }
+</style>
+</head>
+<body>
+<div class="sheet">
+  <div class="wash"></div>
+
+  <div class="head">
+    <div class="brand">
+      <span class="mark">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+          <path d="M3 18 Q6 6 12 12 T 21 6" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/>
+        </svg>
+      </span>
+      <div>
+        <div class="wordmark">Borealis <span>Design</span></div>
+        <div class="tagline">Light, motion, and a little bit of magic.</div>
+      </div>
+    </div>
+    <div class="doc-title">
+      <h1>Rate &amp; Scope</h1>
+      <div class="sub">How we work together</div>
+    </div>
+  </div>
+
+  <p class="intro">A simple, transparent guide to rates and how projects are scoped, quoted, and delivered — so
+    every engagement starts with a clear, shared understanding before any work begins.</p>
+
+  <!-- 1. Standard Rate -->
+  <div class="section">
+    <div class="stitle"><span class="snum">1</span><h2>Standard Rate</h2><span class="bar"></span></div>
+    <div class="rates">
+      <div class="rate">
+        <div class="lbl">Consulting</div>
+        <div class="amt">$55<span class="unit"> / hour</span></div>
+        <div class="note">Design, build, implementation &amp; enablement.</div>
+      </div>
+      <div class="rate">
+        <div class="lbl">Travel</div>
+        <div class="amt">$27.50<span class="unit"> / hour</span></div>
+        <div class="note">Billed at 50% of the standard rate.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. How Projects Work -->
+  <div class="section">
+    <div class="stitle"><span class="snum">2</span><h2>How Projects Work</h2><span class="bar"></span></div>
+    <div class="work">
+      <div class="witem">
+        <span class="wdot"></span>
+        <div>
+          <div class="wh">Defined project → fixed quote</div>
+          <p>A set, written scope is agreed and approved before any work begins. The price is fixed to that scope.</p>
+        </div>
+      </div>
+      <div class="witem">
+        <span class="wdot"></span>
+        <div>
+          <div class="wh">Change orders → separate quick quote</div>
+          <p>Anything added or revised outside the agreed scope gets its own short quote, approved before it's built — no open-ended additions inside a fixed quote.</p>
+        </div>
+      </div>
+      <div class="witem">
+        <span class="wdot"></span>
+        <div>
+          <div class="wh">Exploratory / ongoing work → billed hourly</div>
+          <p>"Try this, change that" work has no fixed scope by nature, so it's billed hourly at the standard rate.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. Fixed-Project Quote Template -->
+  <div class="section">
+    <div class="stitle"><span class="snum">3</span><h2>Fixed-Project Quote Template</h2><span class="bar"></span></div>
+    <div class="tmpl">
+      <div class="cap">Reusable template — one project, one written scope</div>
+
+      <div class="frow">
+        <div class="field"><div class="fl">Project name</div><div class="fline"></div></div>
+        <div class="field"><div class="fl">Total price</div><div class="fline"></div></div>
+      </div>
+
+      <div class="field"><div class="fl">Scope &amp; deliverables</div><div class="fbox"></div></div>
+      <div class="field"><div class="fl">Out of scope</div><div class="fbox"></div></div>
+
+      <div class="frow">
+        <div class="field"><div class="fl">Timeline / milestones</div><div class="fline"></div></div>
+        <div class="field"><div class="fl">Change-order policy</div><div class="fline"></div></div>
+      </div>
+
+      <div class="field">
+        <div class="fl">Payment schedule</div>
+        <div class="schedule">
+          <div class="seg"><div class="pct">50%</div><div class="t">Deposit to start</div></div>
+          <div class="seg"><div class="pct">50%</div><div class="t">On completion</div></div>
+        </div>
+      </div>
+
+      <div class="fineprint">
+        <span><strong>Quote valid 30 days</strong> from date of issue.</span>
+        <span>Approval required before work begins.</span>
+      </div>
+    </div>
+
+    <!-- Retainer option -->
+    <div class="retainer">
+      <span class="tag">Optional</span>
+      <div class="body">
+        <b>Monthly retainer</b> — <span class="fillblank">&nbsp;&nbsp;&nbsp;&nbsp;</span> hours / month for
+        $<span class="fillblank">&nbsp;&nbsp;&nbsp;&nbsp;</span> / month. Priority scheduling; unused hours as agreed.
+      </div>
+    </div>
+  </div>
+
+  <div class="foot">
+    <div class="frule"></div>
+    <div class="fmeta">
+      <span>Borealis Design · Sarasota, FL</span>
+      <span><a href="mailto:openclaudeconsulting@gmail.com">openclaudeconsulting@gmail.com</a></span>
+      <span>Rates effective July 2026</span>
+    </div>
+  </div>
+</div>
+</body>
+</html>

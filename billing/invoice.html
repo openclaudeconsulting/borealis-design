@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Borealis Design — Invoice BD-2026-001</title>
+<link rel="stylesheet" href="fonts/embedded.css" />
+<style>
+  :root {
+    --ink:      #16132a;
+    --ink-soft: #3c3856;
+    --muted:    #6f6b86;
+    --faint:    #a5a1ba;
+    --line:     #e9e6f3;
+    --line-2:   #f1eff8;
+    --panel:    #faf9fe;
+    --a1: #ff4d8d; --a2: #a855f7; --a3: #4f7cff; --a4: #22d3ee;
+    --aurora: linear-gradient(120deg, #ff4d8d 0%, #a855f7 34%, #4f7cff 68%, #22d3ee 100%);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  @page { size: Letter; margin: 0; }
+  html, body { background: #fff; }
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+    font-feature-settings: "cv11", "ss01", "tnum";
+    font-size: 10.5px;
+    line-height: 1.5;
+  }
+  .serif { font-family: 'Instrument Serif', Georgia, serif; font-style: italic; font-weight: 400; }
+  .sheet {
+    position: relative;
+    width: 8.5in;
+    min-height: 11in;
+    margin: 0 auto;
+    padding: 0.7in 0.72in 0.55in;
+    background: #fff;
+    overflow: hidden;
+  }
+  /* full-bleed aurora top band */
+  .sheet::before {
+    content: "";
+    position: absolute; top: 0; left: 0; right: 0; height: 8px;
+    background: var(--aurora);
+  }
+  /* faint aurora wash top-right */
+  .wash {
+    position: absolute; top: -140px; right: -120px;
+    width: 420px; height: 420px; border-radius: 50%;
+    background: var(--aurora);
+    filter: blur(90px); opacity: 0.10; pointer-events: none;
+  }
+
+  /* ---------- letterhead ---------- */
+  .head { display: flex; justify-content: space-between; align-items: flex-start; margin-top: 6px; }
+  .brand { display: flex; gap: 12px; align-items: center; }
+  .mark {
+    position: relative; width: 42px; height: 42px; border-radius: 12px;
+    background: var(--aurora); flex: none;
+    box-shadow: 0 6px 18px -6px rgba(79,124,255,0.45);
+  }
+  .mark svg { position: absolute; inset: 0; margin: auto; }
+  .wordmark { font-size: 19px; font-weight: 700; letter-spacing: -0.02em; line-height: 1; }
+  .wordmark span { color: var(--muted); font-weight: 400; }
+  .tagline { font-size: 9px; color: var(--muted); margin-top: 4px; letter-spacing: 0.01em; }
+
+  .doc-title { text-align: right; }
+  .doc-title h1 {
+    font-family: 'Instrument Serif', Georgia, serif; font-style: italic; font-weight: 400;
+    font-size: 42px; line-height: 0.9; letter-spacing: 0.01em;
+    background: var(--aurora); -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .doc-meta { margin-top: 12px; font-size: 10px; }
+  .doc-meta table { border-collapse: collapse; margin-left: auto; }
+  .doc-meta td { padding: 2px 0 2px 16px; text-align: right; }
+  .doc-meta td.k { color: var(--muted); font-weight: 500; }
+  .doc-meta td.v { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+  /* ---------- parties ---------- */
+  .parties { display: flex; gap: 28px; margin-top: 30px; }
+  .party { flex: 1; }
+  .plabel {
+    font-size: 8.5px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--a2); margin-bottom: 7px;
+  }
+  .party .name { font-size: 13px; font-weight: 700; color: var(--ink); letter-spacing: -0.01em; }
+  .party .row { color: var(--ink-soft); font-size: 10px; }
+  .party a { color: var(--ink-soft); text-decoration: none; }
+  .rule-grad { height: 2px; background: var(--aurora); border-radius: 2px; opacity: 0.9; margin-bottom: 12px; width: 46px; }
+
+  /* ---------- table ---------- */
+  table.items { width: 100%; border-collapse: collapse; margin-top: 30px; }
+  table.items thead th {
+    font-size: 8.5px; font-weight: 700; letter-spacing: 0.13em; text-transform: uppercase;
+    color: var(--muted); text-align: left; padding: 0 10px 9px; border-bottom: 1.5px solid var(--ink);
+  }
+  table.items thead th.num { text-align: right; }
+  table.items tbody td {
+    padding: 12px 10px; border-bottom: 1px solid var(--line); vertical-align: top;
+    font-size: 10.5px; color: var(--ink-soft);
+  }
+  table.items tbody td.desc { color: var(--ink); font-weight: 500; }
+  table.items tbody td.desc small { display: block; color: var(--muted); font-weight: 400; font-size: 9px; margin-top: 2px; }
+  table.items tbody td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  table.items tbody td.amt { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; color: var(--ink); white-space: nowrap; }
+  col.c-desc { width: 52%; } col.c-hrs { width: 12%; } col.c-rate { width: 16%; } col.c-amt { width: 20%; }
+
+  /* ---------- totals ---------- */
+  .totals { display: flex; justify-content: flex-end; margin-top: 18px; }
+  .totals .box { width: 3in; }
+  .totals .line { display: flex; justify-content: space-between; padding: 5px 10px; font-size: 10.5px; color: var(--ink-soft); }
+  .totals .line .lbl { color: var(--muted); }
+  .totals .line .val { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--ink); }
+  .totals .grand {
+    margin-top: 8px; padding: 12px 14px; border-radius: 12px;
+    background: var(--ink); color: #fff;
+    display: flex; justify-content: space-between; align-items: center;
+    position: relative; overflow: hidden;
+  }
+  .totals .grand::after {
+    content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 5px; background: var(--aurora);
+  }
+  .totals .grand .lbl { font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; color: #cfc9e8; font-weight: 600; }
+  .totals .grand .val { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+
+  .estimate-note {
+    margin-top: 14px; font-size: 9px; color: var(--muted); font-style: italic;
+    display: flex; gap: 7px; align-items: flex-start;
+  }
+  .estimate-note .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--a1); margin-top: 5px; flex: none; }
+
+  /* ---------- pay panel ---------- */
+  .paygrid { display: flex; gap: 16px; margin-top: 26px; }
+  .paycard { flex: 1; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 15px 16px; }
+  .paycard h3 {
+    font-size: 8.5px; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase;
+    color: var(--a3); margin-bottom: 9px;
+  }
+  .paycard p { font-size: 10px; color: var(--ink-soft); line-height: 1.55; }
+  .paycard .big { font-size: 13px; font-weight: 700; color: var(--ink); }
+  .methods { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+  .chip {
+    font-size: 9.5px; font-weight: 600; color: var(--ink-soft);
+    background: #fff; border: 1px solid var(--line); border-radius: 999px; padding: 4px 11px;
+  }
+
+  /* ---------- footer ---------- */
+  .foot { position: absolute; left: 0.72in; right: 0.72in; bottom: 0.5in; }
+  .foot .thanks { font-family: 'Instrument Serif', Georgia, serif; font-style: italic; font-size: 15px; color: var(--ink); }
+  .foot .frule { height: 1px; background: var(--line); margin: 12px 0 10px; }
+  .foot .fmeta { display: flex; justify-content: space-between; font-size: 8.5px; color: var(--faint); letter-spacing: 0.02em; }
+  .foot .fmeta a { color: var(--faint); text-decoration: none; }
+</style>
+</head>
+<body>
+<div class="sheet">
+  <div class="wash"></div>
+
+  <!-- Letterhead -->
+  <div class="head">
+    <div>
+      <div class="brand">
+        <span class="mark">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+            <path d="M3 18 Q6 6 12 12 T 21 6" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/>
+          </svg>
+        </span>
+        <div>
+          <div class="wordmark">Borealis <span>Design</span></div>
+          <div class="tagline">Light, motion, and a little bit of magic.</div>
+        </div>
+      </div>
+    </div>
+    <div class="doc-title">
+      <h1>Invoice</h1>
+      <div class="doc-meta">
+        <table>
+          <tr><td class="k">Invoice No.</td><td class="v">BD-2026-001</td></tr>
+          <tr><td class="k">Issue date</td><td class="v">July 8, 2026</td></tr>
+          <tr><td class="k">Due date</td><td class="v">July 15, 2026</td></tr>
+          <tr><td class="k">Terms</td><td class="v">Net 7</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Parties -->
+  <div class="parties">
+    <div class="party">
+      <div class="plabel">From</div>
+      <div class="rule-grad"></div>
+      <div class="name">Borealis Design</div>
+      <div class="row">6330 Hollywood Blvd.</div>
+      <div class="row">Sarasota, FL 34231</div>
+      <div class="row"><a href="mailto:openclaudeconsulting@gmail.com">openclaudeconsulting@gmail.com</a></div>
+    </div>
+    <div class="party">
+      <div class="plabel">Bill To</div>
+      <div class="rule-grad"></div>
+      <div class="name">Chantel Ray Finch</div>
+      <div class="row">6330 Hollywood Blvd.</div>
+      <div class="row">Sarasota, FL 34231</div>
+    </div>
+  </div>
+
+  <!-- Items -->
+  <table class="items">
+    <colgroup><col class="c-desc"/><col class="c-hrs"/><col class="c-rate"/><col class="c-amt"/></colgroup>
+    <thead>
+      <tr>
+        <th>Description</th>
+        <th class="num">Hours</th>
+        <th class="num">Rate</th>
+        <th class="num">Amount</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="desc">On-site consulting &amp; implementation<small>~7 visits × 3 hours</small></td>
+        <td class="num">21</td>
+        <td class="num">$55.00</td>
+        <td class="amt">$1,155.00</td>
+      </tr>
+      <tr>
+        <td class="desc">On-site travel, round-trip<small>7 trips × 1.5 hours, billed at 50%</small></td>
+        <td class="num">10.5</td>
+        <td class="num">$27.50</td>
+        <td class="amt">$288.75</td>
+      </tr>
+      <tr>
+        <td class="desc">AI training &amp; enablement sessions<small>Recorded for reference</small></td>
+        <td class="num">5</td>
+        <td class="num">$55.00</td>
+        <td class="amt">$275.00</td>
+      </tr>
+      <tr>
+        <td class="desc">Hardware procurement trip<small>Apple Store</small></td>
+        <td class="num">3</td>
+        <td class="num">$55.00</td>
+        <td class="amt">$165.00</td>
+      </tr>
+      <tr>
+        <td class="desc">CRM design &amp; build<small>Task-based checklist CRM</small></td>
+        <td class="num">25</td>
+        <td class="num">$55.00</td>
+        <td class="amt">$1,375.00</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- Totals -->
+  <div class="totals">
+    <div class="box">
+      <div class="line"><span class="lbl">Subtotal</span><span class="val">$3,258.75</span></div>
+      <div class="grand">
+        <span class="lbl">Total Due</span>
+        <span class="val">$3,258.75</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="estimate-note">
+    <span class="dot"></span>
+    <span>Hours shown are good-faith estimates of time invested from April 29, 2026 to present and may be adjusted to reflect actual time worked.</span>
+  </div>
+
+  <!-- Payment -->
+  <div class="paygrid">
+    <div class="paycard">
+      <h3>Payment Terms</h3>
+      <p><span class="big">Net 7</span> — payment due by July 15, 2026.<br/>Please reference invoice <strong>BD-2026-001</strong> with your payment.</p>
+    </div>
+    <div class="paycard">
+      <h3>Accepted Payment Methods</h3>
+      <div class="methods">
+        <span class="chip">Zelle</span>
+        <span class="chip">Check</span>
+        <span class="chip">Stripe</span>
+      </div>
+      <p style="margin-top:9px;">Zelle &amp; Stripe payable to the email above. Checks payable to Borealis Design.</p>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="foot">
+    <div class="thanks">Thank you for partnering with Borealis Design.</div>
+    <div class="frule"></div>
+    <div class="fmeta">
+      <span>Borealis Design · Sarasota, FL</span>
+      <span><a href="mailto:openclaudeconsulting@gmail.com">openclaudeconsulting@gmail.com</a></span>
+      <span>Invoice BD-2026-001</span>
+    </div>
+  </div>
+</div>
+</body>
+</html>
