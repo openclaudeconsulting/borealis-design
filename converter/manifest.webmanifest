@@ -1,0 +1,22 @@
+{
+  "name": "Roam — travel companion",
+  "short_name": "Roam",
+  "description": "Point your camera at any price tag and see it in your home currency — plus offline converters, tipping, sizes, a phrasebook and country essentials for travellers.",
+  "id": "/converter/",
+  "start_url": "/converter/?source=pwa",
+  "scope": "/converter/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#07060d",
+  "background_color": "#07060d",
+  "categories": ["travel", "finance", "utilities", "navigation"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Scan a price", "short_name": "Lens", "url": "/converter/?source=pwa#/lens" },
+    { "name": "Convert currency", "short_name": "Convert", "url": "/converter/?source=pwa#/convert" }
+  ]
+}

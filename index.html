@@ -12,11 +12,16 @@
 
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet" />
+<!-- Fonts load async so a slow font CDN can never block rendering; system
+     fonts show first (display=swap) and Inter swaps in when ready. -->
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Instrument+Serif:ital@0;1&display=swap" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet" media="print" onload="this.media='all'" />
+<noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet" /></noscript>
 
-<script src="https://cdn.tailwindcss.com"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+<!-- Precompiled Tailwind (static, no runtime engine) so the page paints instantly
+     with no restyle reflow. GSAP/ScrollTrigger load at the end of <body> so they
+     never block first paint or interactivity. -->
+<script>document.documentElement.classList.add('js');</script>
 
 <style>
   :root {
@@ -277,7 +282,9 @@
   ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.18); }
 
   /* ========== Reveal ========== */
-  .reveal { opacity: 0; transform: translateY(40px); }
+  /* Only hide reveal content when JS is present to animate it in. If JS or the
+     animation library fails to load, content stays visible instead of blank. */
+  .js .reveal { opacity: 0; transform: translateY(40px); }
 
   /* ========== Cursor halo ========== */
   .cursor-halo {
@@ -889,7 +896,51 @@
 
   /* Anchor offset for fixed nav */
   section[id] { scroll-margin-top: 80px; }
+
+  /* ========== Mobile GPU relief ==========
+     Huge blurred blobs + blend modes + full-screen backdrop-filters are
+     brutally expensive to composite on phone GPUs — enough to hang taps
+     and get the tab force-reloaded by the browser. On small screens use
+     fewer, softer, STATIC blobs and lighter glass. The look survives;
+     the page stays responsive. */
+  @media (max-width: 768px) {
+    .aurora-blob {
+      filter: blur(60px);
+      opacity: 0.38;
+      mix-blend-mode: normal;
+      animation: none !important;
+      will-change: auto;
+    }
+    .aurora-blob.b4, .aurora-blob.b5 { display: none; }
+    .noise { display: none; }
+    .nav-glass {
+      backdrop-filter: blur(14px) saturate(160%);
+      -webkit-backdrop-filter: blur(14px) saturate(160%);
+    }
+    .glass-card {
+      backdrop-filter: blur(12px) saturate(160%);
+      -webkit-backdrop-filter: blur(12px) saturate(160%);
+    }
+    /* The menu overlay's gradient is nearly opaque anyway — skip the
+       full-screen backdrop blur and soften its decorative blobs. */
+    .mobile-nav::before {
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+      background: linear-gradient(180deg, rgba(7,6,13,0.97) 0%, rgba(12,10,24,0.985) 100%);
+    }
+    .mobile-nav-aurora .mblob { filter: blur(50px); opacity: 0.35; }
+  }
+
+  /* Respect users who ask for less motion. */
+  @media (prefers-reduced-motion: reduce) {
+    .aurora-blob, .marquee, .reticle::before, .reticle::after { animation: none !important; }
+    html { scroll-behavior: auto; }
+  }
 </style>
+
+<!-- Precompiled Tailwind loaded after the base styles so utilities (e.g. `hidden`,
+     responsive variants) win over component classes, matching the old CDN order. -->
+<link rel="stylesheet" href="/tw.css" />
 </head>
 <body class="antialiased">
 
@@ -915,6 +966,7 @@
       <a href="#automate" class="hover:text-white transition">Automate</a>
       <a href="#process" class="hover:text-white transition">Process</a>
       <a href="#work" class="hover:text-white transition">Work</a>
+      <a href="/converter/" class="hover:text-white transition">Roam</a>
       <a href="#contact" class="hover:text-white transition">Contact</a>
     </div>
 
@@ -954,6 +1006,10 @@
       </a></li>
       <li><a href="#work" class="mobile-nav-link">
         <span><span class="num">04</span>Work</span>
+        <svg class="arrow" width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </a></li>
+      <li><a href="/converter/" class="mobile-nav-link">
+        <span><span class="num">05</span>Roam</span>
         <svg class="arrow" width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </a></li>
       <li><a href="#contact" class="mobile-nav-link">
@@ -1730,10 +1786,149 @@
   </div>
 </footer>
 
+<!-- ============================================================
+     Script 1 — INTERACTIVITY. Runs immediately, depends on nothing:
+     menu, form, hover sheen, cursor halo. A slow or failed animation
+     library can never leave the page unresponsive again.
+     ============================================================ -->
 <script>
-  // ===== Tailwind config (extend if needed) =====
-  tailwind.config = { theme: { extend: {} } };
+  // ===== Mobile menu — full overlay nav =====
+  (function () {
+    const menuBtn   = document.getElementById('menuBtn');
+    const mobileNav = document.getElementById('mobileNav');
+    if (!menuBtn || !mobileNav) return;
 
+    const openMenu = () => {
+      mobileNav.classList.add('is-open');
+      menuBtn.classList.add('is-open');
+      menuBtn.setAttribute('aria-expanded', 'true');
+      menuBtn.setAttribute('aria-label', 'Close menu');
+      mobileNav.setAttribute('aria-hidden', 'false');
+      document.body.classList.add('menu-open');
+    };
+    const closeMenu = () => {
+      mobileNav.classList.remove('is-open');
+      menuBtn.classList.remove('is-open');
+      menuBtn.setAttribute('aria-expanded', 'false');
+      menuBtn.setAttribute('aria-label', 'Open menu');
+      mobileNav.setAttribute('aria-hidden', 'true');
+      document.body.classList.remove('menu-open');
+    };
+    menuBtn.addEventListener('click', () => {
+      if (mobileNav.classList.contains('is-open')) closeMenu();
+      else openMenu();
+    });
+    mobileNav.querySelectorAll('a').forEach((link) => {
+      link.addEventListener('click', () => { setTimeout(closeMenu, 120); });
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && mobileNav.classList.contains('is-open')) closeMenu();
+    });
+    window.addEventListener('resize', () => {
+      if (window.innerWidth >= 768 && mobileNav.classList.contains('is-open')) closeMenu();
+    });
+  })();
+
+  // ===== Quote form — submit via Google Apps Script web app =====
+  // Paste the deployment URL from your Apps Script web app here.
+  // (Deploy → New deployment → Web app → Anyone → copy the /exec URL)
+  // See apps-script.gs in the repo for the script code + setup instructions.
+  (function () {
+    const APPS_SCRIPT_URL = 'PASTE_YOUR_APPS_SCRIPT_DEPLOYMENT_URL_HERE';
+    const quoteForm   = document.getElementById('quoteForm');
+    const quoteStatus = document.getElementById('formStatus');
+    const quoteSubmit = document.getElementById('quoteSubmit');
+    if (!quoteForm) return;
+
+    quoteForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      // Spam honeypot — bots fill it, humans don't
+      if (quoteForm.querySelector('[name="_honey"]').value) return;
+
+      const originalBtn = quoteSubmit.innerHTML;
+      quoteSubmit.disabled = true;
+      quoteSubmit.style.opacity = '0.7';
+      quoteSubmit.innerHTML = 'Sending…';
+      quoteStatus.className = 'form-status';
+      quoteStatus.textContent = '';
+
+      const formData = new FormData(quoteForm);
+      try {
+        // Apps Script returns CORS headers when deployed as "Anyone".
+        // FormData is sent as multipart/form-data; doPost reads it via e.parameter.
+        const res = await fetch(APPS_SCRIPT_URL, { method: 'POST', body: formData });
+        const data = await res.json();
+        if (data && data.success) {
+          quoteStatus.className = 'form-status is-success';
+          quoteStatus.innerHTML = '✓ Thanks — we got your inquiry. We\'ll respond within one business day.';
+          quoteForm.reset();
+          quoteStatus.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        } else {
+          throw new Error((data && data.error) || 'Submission failed');
+        }
+      } catch (err) {
+        quoteStatus.className = 'form-status is-error';
+        quoteStatus.innerHTML = 'Something went wrong sending your inquiry. You can email us directly at <a href="mailto:openclaudeconsulting@gmail.com">openclaudeconsulting@gmail.com</a> and we\'ll respond right away.';
+      } finally {
+        quoteSubmit.disabled = false;
+        quoteSubmit.style.opacity = '';
+        quoteSubmit.innerHTML = originalBtn;
+      }
+    });
+  })();
+
+  // ===== Liquid glass — cursor-tracking sheen (CSS vars only) =====
+  document.querySelectorAll('.glass-card').forEach((el) => {
+    el.addEventListener('mousemove', (e) => {
+      const rect = el.getBoundingClientRect();
+      el.style.setProperty('--mx', ((e.clientX - rect.left) / rect.width) * 100 + '%');
+      el.style.setProperty('--my', ((e.clientY - rect.top) / rect.height) * 100 + '%');
+    });
+    el.addEventListener('mouseleave', () => {
+      el.style.removeProperty('--mx');
+      el.style.removeProperty('--my');
+    });
+  });
+
+  // ===== Cursor halo (desktop pointers only — hidden on touch) =====
+  (function () {
+    const halo = document.getElementById('cursorHalo');
+    if (!halo || !window.matchMedia || !matchMedia('(pointer: fine)').matches) return;
+    let mouseX = 0, mouseY = 0, haloX = 0, haloY = 0;
+    window.addEventListener('mousemove', (e) => { mouseX = e.clientX; mouseY = e.clientY; });
+    (function animateHalo() {
+      haloX += (mouseX - haloX) * 0.08;
+      haloY += (mouseY - haloY) * 0.08;
+      halo.style.transform = `translate(${haloX}px, ${haloY}px) translate(-50%, -50%)`;
+      requestAnimationFrame(animateHalo);
+    })();
+  })();
+</script>
+
+<!-- ============================================================
+     Script 2 — ANIMATIONS. Self-hosted GSAP (no third-party CDN to
+     stall or be blocked), loaded after interactivity is already live.
+     ============================================================ -->
+<script src="/vendor/gsap/gsap.min.js"></script>
+<script src="/vendor/gsap/ScrollTrigger.min.js"></script>
+<script>
+  // Guarantee content is visible even if the animation library fails/stalls.
+  var __revealDone = false;
+  function revealAllContent() {
+    if (__revealDone) return;
+    __revealDone = true;
+    document.querySelectorAll('.reveal').forEach(function (el) {
+      el.style.opacity = 1; el.style.transform = 'none';
+    });
+  }
+  // Safety net: only fires if GSAP didn't take over (it disarms this below).
+  setTimeout(function () { if (!__revealDone) revealAllContent(); }, 3000);
+
+  if (!window.gsap || !window.ScrollTrigger) {
+    // Animation library unavailable — show everything immediately, no freeze.
+    revealAllContent();
+  } else {
+  __revealDone = true; // GSAP is present and will drive the reveals — disarm fallback.
   // ===== GSAP setup =====
   gsap.registerPlugin(ScrollTrigger);
 
@@ -1767,23 +1962,14 @@
   );
 
   // ===== Reveal on scroll =====
-  gsap.utils.toArray('.reveal').forEach((el) => {
-    if (el.hasAttribute('data-stagger')) return; // hero handled separately
-    gsap.fromTo(el,
-      { opacity: 0, y: 40 },
-      {
-        opacity: 1,
-        y: 0,
-        duration: 1,
-        ease: 'power3.out',
-        overwrite: 'auto',
-        scrollTrigger: {
-          trigger: el,
-          start: 'top 88%',
-          toggleActions: 'play none none reverse',
-        },
-      }
-    );
+  // One batched trigger (shared IntersectionObserver) for all reveal elements
+  // instead of ~40 individual ScrollTriggers — far cheaper to initialise, so
+  // load no longer stalls the main thread.
+  const revealEls = gsap.utils.toArray('.reveal').filter((el) => !el.hasAttribute('data-stagger'));
+  ScrollTrigger.batch(revealEls, {
+    start: 'top 88%',
+    onEnter: (batch) => gsap.to(batch, { opacity: 1, y: 0, duration: 1, ease: 'power3.out', stagger: 0.08, overwrite: 'auto' }),
+    onLeaveBack: (batch) => gsap.to(batch, { opacity: 0, y: 40, duration: 0.4, overwrite: 'auto' }),
   });
 
   // ===== Process timeline draw =====
@@ -1819,21 +2005,6 @@
     });
   }, 800);
 
-  // ===== Liquid glass — cursor-tracking sheen =====
-  document.querySelectorAll('.glass-card').forEach((el) => {
-    el.addEventListener('mousemove', (e) => {
-      const rect = el.getBoundingClientRect();
-      const x = ((e.clientX - rect.left) / rect.width) * 100;
-      const y = ((e.clientY - rect.top) / rect.height) * 100;
-      el.style.setProperty('--mx', x + '%');
-      el.style.setProperty('--my', y + '%');
-    });
-    el.addEventListener('mouseleave', () => {
-      el.style.removeProperty('--mx');
-      el.style.removeProperty('--my');
-    });
-  });
-
   // ===== Magnetic buttons =====
   document.querySelectorAll('.magnetic').forEach((btn) => {
     btn.addEventListener('mousemove', (e) => {
@@ -1847,134 +2018,23 @@
     });
   });
 
-  // ===== Cursor halo =====
-  const halo = document.getElementById('cursorHalo');
-  let mouseX = 0, mouseY = 0, haloX = 0, haloY = 0;
-  window.addEventListener('mousemove', (e) => {
-    mouseX = e.clientX; mouseY = e.clientY;
-  });
-  function animateHalo() {
-    haloX += (mouseX - haloX) * 0.08;
-    haloY += (mouseY - haloY) * 0.08;
-    halo.style.transform = `translate(${haloX}px, ${haloY}px) translate(-50%, -50%)`;
-    requestAnimationFrame(animateHalo);
-  }
-  animateHalo();
-
-  // ===== Parallax aurora blobs in hero =====
-  gsap.utils.toArray('.aurora-blob').forEach((blob, i) => {
-    gsap.to(blob, {
-      yPercent: -30 - i * 10,
-      ease: 'none',
-      scrollTrigger: {
-        trigger: blob.closest('section'),
-        start: 'top top',
-        end: 'bottom top',
-        scrub: 1.2,
-      },
-    });
-  });
-
-  // ===== Quote form — submit via Google Apps Script web app =====
-  // Paste the deployment URL from your Apps Script web app here.
-  // (Deploy → New deployment → Web app → Anyone → copy the /exec URL)
-  // See apps-script.gs in the repo for the script code + setup instructions.
-  const APPS_SCRIPT_URL = 'PASTE_YOUR_APPS_SCRIPT_DEPLOYMENT_URL_HERE';
-
-  const quoteForm   = document.getElementById('quoteForm');
-  const quoteStatus = document.getElementById('formStatus');
-  const quoteSubmit = document.getElementById('quoteSubmit');
-
-  if (quoteForm) {
-    quoteForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-
-      // Spam honeypot — bots fill it, humans don't
-      if (quoteForm.querySelector('[name="_honey"]').value) return;
-
-      const originalBtn = quoteSubmit.innerHTML;
-      quoteSubmit.disabled = true;
-      quoteSubmit.style.opacity = '0.7';
-      quoteSubmit.innerHTML = 'Sending…';
-      quoteStatus.className = 'form-status';
-      quoteStatus.textContent = '';
-
-      const formData = new FormData(quoteForm);
-
-      try {
-        // Apps Script returns CORS headers when deployed as "Anyone".
-        // FormData is sent as multipart/form-data; doPost reads it via e.parameter.
-        const res = await fetch(APPS_SCRIPT_URL, {
-          method: 'POST',
-          body: formData,
-        });
-        const data = await res.json();
-
-        if (data && data.success) {
-          quoteStatus.className = 'form-status is-success';
-          quoteStatus.innerHTML = '✓ Thanks — we got your inquiry. We\'ll respond within one business day.';
-          quoteForm.reset();
-          quoteStatus.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        } else {
-          throw new Error((data && data.error) || 'Submission failed');
-        }
-      } catch (err) {
-        quoteStatus.className = 'form-status is-error';
-        quoteStatus.innerHTML = 'Something went wrong sending your inquiry. You can email us directly at <a href="mailto:openclaudeconsulting@gmail.com">openclaudeconsulting@gmail.com</a> and we\'ll respond right away.';
-      } finally {
-        quoteSubmit.disabled = false;
-        quoteSubmit.style.opacity = '';
-        quoteSubmit.innerHTML = originalBtn;
-      }
-    });
-  }
-
-  // ===== Mobile menu — full overlay nav =====
-  const menuBtn   = document.getElementById('menuBtn');
-  const mobileNav = document.getElementById('mobileNav');
-
-  if (menuBtn && mobileNav) {
-    const openMenu = () => {
-      mobileNav.classList.add('is-open');
-      menuBtn.classList.add('is-open');
-      menuBtn.setAttribute('aria-expanded', 'true');
-      menuBtn.setAttribute('aria-label', 'Close menu');
-      mobileNav.setAttribute('aria-hidden', 'false');
-      document.body.classList.add('menu-open');
-    };
-
-    const closeMenu = () => {
-      mobileNav.classList.remove('is-open');
-      menuBtn.classList.remove('is-open');
-      menuBtn.setAttribute('aria-expanded', 'false');
-      menuBtn.setAttribute('aria-label', 'Open menu');
-      mobileNav.setAttribute('aria-hidden', 'true');
-      document.body.classList.remove('menu-open');
-    };
-
-    menuBtn.addEventListener('click', () => {
-      if (mobileNav.classList.contains('is-open')) closeMenu();
-      else openMenu();
-    });
-
-    // Tap a link → close menu (smooth-scroll happens via the anchor href)
-    mobileNav.querySelectorAll('a').forEach((link) => {
-      link.addEventListener('click', () => {
-        // Slight delay so the press feels acknowledged before the overlay drops
-        setTimeout(closeMenu, 120);
+  // ===== Parallax aurora blobs in hero (desktop only — scroll-linked
+  // repaints of large blurred layers are too heavy for mobile GPUs) =====
+  if (window.matchMedia && matchMedia('(pointer: fine)').matches) {
+    gsap.utils.toArray('.aurora-blob').forEach((blob, i) => {
+      gsap.to(blob, {
+        yPercent: -30 - i * 10,
+        ease: 'none',
+        scrollTrigger: {
+          trigger: blob.closest('section'),
+          start: 'top top',
+          end: 'bottom top',
+          scrub: 1.2,
+        },
       });
     });
-
-    // Esc closes the menu
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && mobileNav.classList.contains('is-open')) closeMenu();
-    });
-
-    // If the viewport grows past mobile breakpoint while open, just close
-    window.addEventListener('resize', () => {
-      if (window.innerWidth >= 768 && mobileNav.classList.contains('is-open')) closeMenu();
-    });
   }
+  } // end GSAP-enabled enhancements (else branch of the availability check)
 </script>
 
 </body>
