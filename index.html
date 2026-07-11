@@ -14,9 +14,10 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet" />
 
-<script src="https://cdn.tailwindcss.com"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+<!-- Precompiled Tailwind (static, no runtime engine) so the page paints instantly
+     with no restyle reflow. GSAP/ScrollTrigger load at the end of <body> so they
+     never block first paint or interactivity. -->
+<script>document.documentElement.classList.add('js');</script>
 
 <style>
   :root {
@@ -277,7 +278,9 @@
   ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.18); }
 
   /* ========== Reveal ========== */
-  .reveal { opacity: 0; transform: translateY(40px); }
+  /* Only hide reveal content when JS is present to animate it in. If JS or the
+     animation library fails to load, content stays visible instead of blank. */
+  .js .reveal { opacity: 0; transform: translateY(40px); }
 
   /* ========== Cursor halo ========== */
   .cursor-halo {
@@ -890,6 +893,10 @@
   /* Anchor offset for fixed nav */
   section[id] { scroll-margin-top: 80px; }
 </style>
+
+<!-- Precompiled Tailwind loaded after the base styles so utilities (e.g. `hidden`,
+     responsive variants) win over component classes, matching the old CDN order. -->
+<link rel="stylesheet" href="/tw.css" />
 </head>
 <body class="antialiased">
 
@@ -1735,10 +1742,23 @@
   </div>
 </footer>
 
+<!-- Animation libs load here (end of body) so they never block first paint. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
 <script>
-  // ===== Tailwind config (extend if needed) =====
-  tailwind.config = { theme: { extend: {} } };
+  // Guarantee content is visible even if the animation library fails/stalls.
+  function revealAllContent() {
+    document.querySelectorAll('.reveal').forEach(function (el) {
+      el.style.opacity = 1; el.style.transform = 'none';
+    });
+  }
+  // Safety net regardless of what happens below.
+  setTimeout(revealAllContent, 2500);
 
+  if (!window.gsap || !window.ScrollTrigger) {
+    // Animation library unavailable — show everything immediately, no freeze.
+    revealAllContent();
+  } else {
   // ===== GSAP setup =====
   gsap.registerPlugin(ScrollTrigger);
 
@@ -1864,7 +1884,8 @@
     halo.style.transform = `translate(${haloX}px, ${haloY}px) translate(-50%, -50%)`;
     requestAnimationFrame(animateHalo);
   }
-  animateHalo();
+  // The halo is hidden on touch devices — don't run its rAF loop there.
+  if (halo && window.matchMedia && matchMedia('(pointer: fine)').matches) animateHalo();
 
   // ===== Parallax aurora blobs in hero =====
   gsap.utils.toArray('.aurora-blob').forEach((blob, i) => {
@@ -1879,6 +1900,7 @@
       },
     });
   });
+  } // end GSAP-enabled enhancements (else branch of the availability check)
 
   // ===== Quote form — submit via Google Apps Script web app =====
   // Paste the deployment URL from your Apps Script web app here.
