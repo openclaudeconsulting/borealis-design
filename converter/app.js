@@ -573,18 +573,47 @@ function openLens() {
         <a href="#/convert" class="btn-ghost" style="margin-top:14px">Convert manually instead</a></div>`);
     },
     onResult: (r) => {
-      $('lensResult').style.display = 'block';
+      const card = $('lensResult');
+      card.style.display = 'block';
+      card.style.opacity = '1';
       $('lensConv').textContent = r.homeText;
       $('lensSrc').textContent = `${r.fromText} ${r.from} → ${r.home}`;
     },
+    // The camera moved on but OCR hasn't matched anything new — dim the old
+    // number so it reads as "last seen", not "current".
+    onStale: () => { $('lensResult').style.opacity = '0.45'; },
   });
+  startLensSession();
+}
+function startLensSession() {
   lens.start().then((okStarted) => {
-    if (okStarted && lens.torchCapable()) {
-      const tb = $('lensTorch'); tb.style.display = 'grid';
+    if (!okStarted) return;
+    const tb = $('lensTorch');
+    if (lens.torchCapable()) {
+      tb.style.display = 'grid'; tb.style.opacity = '.6';
       tb.onclick = async () => { const on = await lens.toggleTorch(); tb.style.opacity = on ? '1' : '.6'; };
+    } else {
+      tb.style.display = 'none';
     }
   });
+  // Full restart escape hatch — fresh camera, fresh OCR worker, clean state.
+  $('lensReset').onclick = async () => {
+    $('lensStatus').textContent = 'Restarting…';
+    $('lensResult').style.display = 'none';
+    lensMsg('');
+    await lens.reset();
+    const tb = $('lensTorch');
+    if (lens.torchCapable()) { tb.style.display = 'grid'; tb.style.opacity = '.6'; }
+    else tb.style.display = 'none';
+  };
 }
+// iOS pauses camera streams when the app is backgrounded and won't always
+// resume them — release on hide, reacquire on return.
+document.addEventListener('visibilitychange', () => {
+  if (!lens || !lensStage.classList.contains('on')) return;
+  if (document.hidden) lens.stop();
+  else startLensSession();
+});
 function closeLens(navigateBack = true) {
   lensStage.classList.remove('on');
   document.body.style.overflow = '';
