@@ -29,11 +29,19 @@ function guessHome() {
 const state = {
   home: store.get('home', guessHome()),
   shop: store.get('shop', 'EUR'),
+  dest: store.get('dest', null), // country code — the trip destination
   rates: { ...FALLBACK_RATES }, ratesLive: false, ratesDate: null,
   wallet: store.get('wallet', []),
 };
 function setHome(c) { state.home = c; store.set('home', c); }
 function setShop(c) { state.shop = c; store.set('shop', c); }
+function setDest(code) {
+  state.dest = code || null;
+  store.set('dest', state.dest);
+  // The destination drives the app: its currency becomes the shop currency
+  // used by Lens, Convert, Tips and Wallet.
+  if (state.dest && COUNTRIES[state.dest]) setShop(COUNTRIES[state.dest].currency);
+}
 
 /* ---------- tiny helpers ---------- */
 const $ = (id) => document.getElementById(id);
@@ -42,6 +50,11 @@ const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&
 function currencyOptions(sel) {
   return Object.keys(CURRENCIES).map((c) =>
     `<option value="${c}" ${c === sel ? 'selected' : ''}>${CURRENCIES[c].flag}  ${c} · ${esc(CURRENCIES[c].name)}</option>`).join('');
+}
+function destOptions(sel) {
+  const codes = Object.keys(COUNTRIES).sort((a, b) => COUNTRIES[a].name.localeCompare(COUNTRIES[b].name));
+  return `<option value="">🌍  Choose a destination…</option>` + codes.map((c) =>
+    `<option value="${c}" ${c === sel ? 'selected' : ''}>${COUNTRIES[c].flag}  ${esc(COUNTRIES[c].name)}</option>`).join('');
 }
 function num(v) { const n = parseFloat(v); return Number.isFinite(n) ? n : NaN; }
 
@@ -72,6 +85,51 @@ const TOOLS = [
   { key: 'wallet', route: '#/wallet', emoji: '👛', name: 'Wallet', sub: 'Track trip spending' },
 ];
 
+// Destination briefing card for the home screen. With no destination set it
+// invites the traveller to pick one; with one set it shows the essentials
+// at a glance and quick actions tuned to that country.
+function destCardHTML() {
+  if (!state.dest || !COUNTRIES[state.dest]) {
+    return `
+    <div class="glass" style="padding:16px;margin-bottom:16px">
+      <div style="font-weight:800;font-size:18px;margin-bottom:4px">🌍 Where are you headed?</div>
+      <p class="muted" style="font-size:13.5px;margin:0 0 12px">Pick a destination and every tool — Lens, money, tips, phrases, essentials — tunes itself to it.</p>
+      <select id="homeDest" class="sel" aria-label="Choose destination">${destOptions('')}</select>
+    </div>`;
+  }
+  const c = COUNTRIES[state.dest];
+  const em = c.emergency;
+  const emTxt = em.all || [em.police, em.ambulance].filter(Boolean).join(' / ');
+  const w = WATER_LABEL[c.water];
+  const r = unitRate(state.home, c.currency, state.rates);
+  const langName = c.lang && LANGUAGES[c.lang] ? LANGUAGES[c.lang].name : null;
+  const tip = TIPPING[state.dest];
+  return `
+  <div class="glass" style="padding:16px;margin-bottom:16px">
+    <div style="display:flex;align-items:center;gap:12px">
+      <span style="font-size:32px">${c.flag}</span>
+      <div style="flex:1;min-width:0">
+        <div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.12em;font-weight:700;opacity:.6">Travelling to</div>
+        <div style="font-weight:800;font-size:21px;letter-spacing:-0.02em">${esc(c.name)}</div>
+      </div>
+      <button id="changeDest" class="chip">Change</button>
+    </div>
+    <div class="row-list" style="margin-top:6px">
+      <div><span class="muted">💱 Money</span><strong>1 ${state.home} ≈ ${formatMoney(r, c.currency)}</strong></div>
+      <div><span class="muted">🚨 Emergency</span><strong>${emTxt}</strong></div>
+      <div><span class="muted">🔌 Power</span><strong>${c.plugs.map((p) => 'Type ' + p).join(', ')} · ${c.voltage}V</strong></div>
+      <div><span class="muted">💧 Tap water</span><span class="chip pill-${w.tone}" style="cursor:default">${c.water}</span></div>
+      <div><span class="muted">🚗 Driving</span><strong>${c.drive === 'left' ? 'Left side' : 'Right side'}</strong></div>
+      ${tip ? `<div><span class="muted">🧾 Tipping</span><strong>${tip.pct[1] > 0 ? '~' + tip.pct[1] + '%' : 'Not expected'}</strong></div>` : ''}
+    </div>
+    <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
+      <button class="btn-primary" data-nav="#/lens" style="padding:11px 18px;font-size:14px">🔍 Scan prices</button>
+      <button class="btn-ghost" data-nav="#/essentials" style="padding:11px 16px;font-size:13.5px">Full guide</button>
+      ${langName ? `<button class="btn-ghost" data-nav="#/phrasebook" style="padding:11px 16px;font-size:13.5px">Speak ${langName}</button>` : ''}
+    </div>
+  </div>`;
+}
+
 function viewHome() {
   const tiles = TOOLS.map((t) => t.flag ? `
     <button class="tile flag" data-nav="${t.route}">
@@ -96,9 +154,16 @@ function viewHome() {
           <span class="stat">🏠 Home · ${state.home}</span>
         </div>
       </div>
+      ${destCardHTML()}
       <div class="tile-grid">${tiles}</div>
       <p class="muted" style="text-align:center; font-size:12px; margin-top:22px">Works offline · installable · a Borealis Design experiment</p>
-    </div>` , mount() { document.querySelectorAll('[data-rate-status]').forEach(refreshRateStatus); } };
+    </div>` , mount() {
+      document.querySelectorAll('[data-rate-status]').forEach(refreshRateStatus);
+      const hd = document.getElementById('homeDest');
+      if (hd) hd.addEventListener('change', (e) => { setDest(e.target.value); renderRoute(); });
+      const cd = document.getElementById('changeDest');
+      if (cd) cd.addEventListener('click', openMenu);
+    } };
 }
 
 function viewConvert() {
@@ -256,7 +321,8 @@ function viewTips() {
         </div>
       </div>
       <div class="field" style="margin-bottom:12px"><label>Country</label><select id="tpCountry" class="sel" style="margin-top:6px">
-        ${countries.map((c) => `<option value="${c}" ${c === 'US' ? 'selected' : ''}>${TIPPING[c].name}</option>`).join('')}</select></div>
+        ${(() => { const init = state.dest && TIPPING[state.dest] ? state.dest : 'US';
+          return countries.map((c) => `<option value="${c}" ${c === init ? 'selected' : ''}>${TIPPING[c].name}</option>`).join(''); })()}</select></div>
       <div style="margin-bottom:12px"><label style="font-size:11px;text-transform:uppercase;letter-spacing:.12em" class="muted">Tip</label>
         <div class="seg" id="tpPct" style="margin-top:6px"></div></div>
       <div class="field" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
@@ -322,7 +388,11 @@ function viewPhrasebook() {
     <div id="phList" style="display:flex;flex-direction:column;gap:10px"></div>
   </div>`;
   function mount() {
-    let lang = langs[0], cat = PHRASE_CATS[0];
+    // Open in the destination's language when we have a phrasebook for it.
+    const destLang = state.dest && COUNTRIES[state.dest] && COUNTRIES[state.dest].lang;
+    let lang = destLang && LANGUAGES[destLang] ? destLang : langs[0];
+    let cat = PHRASE_CATS[0];
+    $('phLang').value = lang;
     const canSpeak = 'speechSynthesis' in window;
     const render = () => {
       const items = PHRASES.filter((p) => p.cat === cat);
@@ -400,9 +470,13 @@ function viewEssentials() {
       $('esCard').querySelectorAll('[data-shop2]').forEach((b) => b.addEventListener('click', () => { setShop(b.dataset.shop2); location.hash = '#/lens'; }));
     };
     sel.addEventListener('change', render);
-    // Preselect a country matching the shop currency, if any.
-    const match = codes.find((c) => COUNTRIES[c].currency === state.shop);
-    if (match) sel.value = match;
+    // Preselect the trip destination; fall back to a shop-currency match.
+    if (state.dest && COUNTRIES[state.dest]) {
+      sel.value = state.dest;
+    } else {
+      const match = codes.find((c) => COUNTRIES[c].currency === state.shop);
+      if (match) sel.value = match;
+    }
     render();
   }
   return { html, mount };
@@ -528,7 +602,7 @@ const menuSheet = $('menuSheet');
 function openMenu() {
   // Populate fresh each open so selections always mirror current state.
   $('menuHome').innerHTML = currencyOptions(state.home);
-  $('menuShop').innerHTML = currencyOptions(state.shop);
+  $('menuDest').innerHTML = destOptions(state.dest || '');
   menuSheet.classList.add('on');
   menuSheet.setAttribute('aria-hidden', 'false');
   $('menuBtn').setAttribute('aria-expanded', 'true');
@@ -548,7 +622,13 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && menuSheet.classList.contains('on')) closeMenu();
 });
 $('menuHome').addEventListener('change', (e) => { setHome(e.target.value); renderRoute(); });
-$('menuShop').addEventListener('change', (e) => { setShop(e.target.value); renderRoute(); });
+$('menuDest').addEventListener('change', (e) => {
+  setDest(e.target.value);
+  closeMenu();
+  // Land on home so the whole app visibly shifts to the new destination.
+  if (location.hash === '#/' || location.hash === '') renderRoute();
+  else location.hash = '#/';
+});
 $('menuRefresh').addEventListener('click', async (e) => {
   const btn = e.currentTarget;
   btn.disabled = true; btn.textContent = 'Refreshing…';

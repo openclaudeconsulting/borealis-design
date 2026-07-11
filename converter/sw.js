@@ -5,7 +5,7 @@
    works offline afterwards. The live FX API is never cached.
    ============================================================ */
 
-const VERSION = 'v4';
+const VERSION = 'v5';
 const SHELL_CACHE = `roam-shell-${VERSION}`;
 const RUNTIME_CACHE = `roam-runtime-${VERSION}`;
 
