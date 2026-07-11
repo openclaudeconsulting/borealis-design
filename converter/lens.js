@@ -15,7 +15,7 @@
      full restart.
    ============================================================ */
 
-import { parsePrice } from './lib/parsePrice.js';
+import { selectPrices } from './lib/parsePrice.js';
 import { convert, formatMoney } from './lib/convert.js';
 
 const VENDOR = new URL('vendor/tesseract/', document.baseURI).href;
@@ -82,12 +82,13 @@ export function createLens(opts) {
     // Character set and layout mode are shared with tools/lens-eval.mjs —
     // keep them in sync. Letters and % stay VISIBLE to OCR so the parser can
     // recognise non-prices ("40% RECYCLED POLYESTER", "500g", "6 pk") instead
-    // of mistaking their digits for money. PSM 4 (single column, variable
-    // sizes) is essential: tags put a huge price under small text, and PSM 6
-    // silently drops the price line for violating its uniformity assumption.
+    // of mistaking their digits for money. PSM 11 (sparse text) is essential:
+    // block/column modes (6 and even 4) silently DROP a huge price line when
+    // it doesn't fit the layout they assume — sparse finds every text chunk
+    // with its bbox, and we restore top-to-bottom order ourselves.
     await w.setParameters({
       tessedit_char_whitelist: "0123456789.,'€£$¥₩₹฿%ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyzÉÈéè /()-",
-      tessedit_pageseg_mode: '4',
+      tessedit_pageseg_mode: '11',
     });
     worker = w;
     emitReady();
@@ -212,30 +213,30 @@ export function createLens(opts) {
       const shop = getShopCurrency();
       const home = getHomeCurrency();
       const rates = getRates();
-      // Parse every OCR line separately: a menu with several prices yields
-      // one converted entry per line, preserved in top-to-bottom order.
+      // Feed OCR lines (with their pixel heights) to the shared selection
+      // logic: strict per-line parsing, big-print priority, and per-unit
+      // price demotion — identical to what tools/lens-eval.mjs scores.
       const lines = (data.lines && data.lines.length)
         ? data.lines
-        : String(data.text || '').split('\n').map((t) => ({ text: t, confidence: data.confidence }));
-      const items = [];
-      for (const ln of lines) {
-        if (!ln.text) continue;
-        if (ln.confidence != null && ln.confidence < 30) continue;
-        // strict: a number must prove it's a price (symbol/ISO/decimals) —
-        // bare digits from percentages, quantities and codes don't qualify.
-        const parsed = parsePrice(ln.text, { shopCurrency: shop, strict: true });
-        if (!parsed || !(parsed.value > 0)) continue;
-        const from = parsed.currency || shop;
-        const converted = convert(parsed.value, from, home, rates);
-        if (!Number.isFinite(converted)) continue;
-        items.push({
-          value: parsed.value, from, home, converted,
-          fromText: formatMoney(parsed.value, from),
+            .map((l) => ({
+              text: l.text,
+              confidence: l.confidence,
+              height: l.bbox ? (l.bbox.y1 - l.bbox.y0) : 0,
+              top: l.bbox ? l.bbox.y0 : 0,
+            }))
+            .sort((a, b) => a.top - b.top) // sparse mode: restore reading order
+        : String(data.text || '').split('\n').map((t) => ({ text: t, confidence: data.confidence, height: 0 }));
+      const items = selectPrices(lines, { shopCurrency: shop }).map((sel) => {
+        const from = sel.currency || shop;
+        const converted = convert(sel.value, from, home, rates);
+        if (!Number.isFinite(converted)) return null;
+        return {
+          value: sel.value, from, home, converted,
+          fromText: formatMoney(sel.value, from),
           homeText: formatMoney(converted, home),
-          raw: parsed.raw,
-        });
-        if (items.length >= 6) break; // keep the overlay readable
-      }
+          raw: sel.raw,
+        };
+      }).filter(Boolean);
       if (items.length) {
         // Two-frame voting: only surface a reading the OCR produced twice in
         // a row. Single-frame hallucinations (glare, motion blur, overlapping

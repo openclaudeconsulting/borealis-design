@@ -133,7 +133,10 @@ export function parsePrice(text, opts = {}) {
 
   // Find every number-like token together with its surrounding characters so we
   // can associate a currency symbol sitting just before or after it.
-  const numRe = /(\d[\d.,'’\s ]*\d|\d)/g;
+  // Spaces join digits ONLY as thousands grouping (“1 234,56”). A loose
+  // space class would glue unrelated numbers on OCR-merged lines
+  // (“818103  1,31” → 8 million) — the source of barcode-sized “prices”.
+  const numRe = /(\d{1,3}(?:[ \u00A0\u2009]\d{3})+(?:[.,]\d+)?|\d[\d.,'\u2019]*\d|\d)/g;
   const candidates = [];
   let m;
   while ((m = numRe.exec(cleaned)) !== null) {
@@ -148,18 +151,25 @@ export function parsePrice(text, opts = {}) {
     // Neither is a plain unit quantity ("500g", "1.5 L") unless a currency
     // symbol anchors it as money.
     if (UNIT_AFTER.test(after) && !/[€£$¥₩₹฿₫₴₪₱]/.test(before)) continue;
+    // Digit groups linked by dashes or slashes are codes, not money:
+    // barcodes ("006-28110-14602"), dates ("2026/03/11"), ranges.
+    if (/\d[-/]$/.test(before.replace(/\s+$/, '')) || /^[-/]\s*\d/.test(after.replace(/^\s+/, ''))) continue;
 
     const value = parseNumber(rawNum);
     if (!Number.isFinite(value) || value <= 0) continue;
 
     // Look for a currency symbol immediately before (preferred) or after.
+    // "After" must be ADJACENT (≤2 chars away): on OCR-merged lines like
+    // "818103  1,31 $" the $ belongs to 1,31, and a loose window would let
+    // the barcode fragment steal it as price evidence.
     let symbol = null;
     for (const tok of SYMBOL_TOKENS) {
       if (before.trimEnd().endsWith(tok)) { symbol = tok; break; }
     }
     if (!symbol) {
       for (const tok of SYMBOL_TOKENS) {
-        if (after.trimStart().startsWith(tok)) { symbol = tok; break; }
+        const head = after.slice(0, tok.length + 2);
+        if (head.trimStart().startsWith(tok) && (head.length - head.trimStart().length) <= 2) { symbol = tok; break; }
       }
     }
     // A 3-letter ISO code near the number (e.g. "19.95 CHF").
@@ -171,10 +181,14 @@ export function parsePrice(text, opts = {}) {
     candidates.push({ value, symbol, iso, hasDecimal, raw: rawNum.trim() });
   }
 
-  // Strict mode: demand positive evidence of price-ness. A bare integer only
-  // qualifies where whole-number prices are the norm (zero-decimal currency).
+  // Strict mode: demand positive evidence of price-ness, and a plausible
+  // magnitude — a 34-million grocery price is a barcode, not money. A bare
+  // integer only qualifies where whole-number prices are the norm
+  // (zero-decimal currency).
+  const maxPlausible = ZERO_DECIMAL.has(hint) ? 10_000_000 : 99_999.99;
   const pool = strict
-    ? candidates.filter((c) => c.symbol || c.iso || c.hasDecimal || ZERO_DECIMAL.has(hint))
+    ? candidates.filter((c) =>
+        (c.symbol || c.iso || c.hasDecimal || ZERO_DECIMAL.has(hint)) && c.value <= maxPlausible)
     : candidates;
 
   if (pool.length === 0) return null;
@@ -191,6 +205,52 @@ export function parsePrice(text, opts = {}) {
   const best = pool[0];
   const currency = resolveCurrency(best.symbol, best.iso, hint);
   return { value: best.value, currency, symbol: best.symbol || null, raw: best.raw };
+}
+
+/* ============================================================
+   selectPrices — turn OCR lines into the prices worth showing.
+   Shared by the live Lens (converter/lens.js) and the regression
+   harness (tools/lens-eval.mjs) so both exercise identical logic.
+
+   Beyond per-line strict parsing, this applies layout intelligence:
+   - BIG-PRINT PRIORITY: tags print THE price large and everything
+     else (unit prices, codes, weights) small. Lines shorter than
+     55% of the tallest priced line are dropped. Menus, where all
+     lines are similar height, keep everything.
+   - Per-unit prices ("1,31 $ / 100 ml") lose to the main price.
+   ============================================================ */
+const UNIT_PRICE_LINE = /\/\s*\d*\s*(ml|cl|l|g|kg|lb|lbs|oz|ea|un|unit|pc|pcs|each)\b/i;
+
+/**
+ * @param {Array<{text:string, confidence?:number, height?:number}>} lines
+ *   OCR lines in top-to-bottom order (height = bbox pixel height).
+ * @param {object} opts { shopCurrency, maxItems=6, minConfidence=30 }
+ * @returns {Array<{value:number, currency:string|null, raw:string, height:number, unitPrice:boolean}>}
+ */
+export function selectPrices(lines, opts = {}) {
+  const maxItems = opts.maxItems || 6;
+  const minConf = opts.minConfidence == null ? 30 : opts.minConfidence;
+  const items = [];
+  for (const ln of lines || []) {
+    if (!ln || !ln.text) continue;
+    if (ln.confidence != null && ln.confidence < minConf) continue;
+    const parsed = parsePrice(ln.text, { shopCurrency: opts.shopCurrency, strict: true });
+    if (!parsed || !(parsed.value > 0)) continue;
+    items.push({
+      value: parsed.value,
+      currency: parsed.currency,
+      raw: parsed.raw,
+      height: ln.height || 0,
+      unitPrice: UNIT_PRICE_LINE.test(ln.text),
+    });
+  }
+  if (!items.length) return [];
+  // Big-print priority (only when heights are known).
+  const maxH = Math.max(...items.map((i) => i.height));
+  let kept = maxH > 0 ? items.filter((i) => i.height >= 0.55 * maxH) : items;
+  // The main price beats per-unit small print.
+  if (kept.some((i) => !i.unitPrice)) kept = kept.filter((i) => !i.unitPrice);
+  return kept.slice(0, maxItems);
 }
 
 export default parsePrice;
