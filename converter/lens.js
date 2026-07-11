@@ -60,6 +60,9 @@ export function createLens(opts) {
   let track = null, torchOn = false;
   let lastGoodAt = 0, staleNotified = false;
   let pendingSig = null, pendingVotes = 0;
+  let lastCrop = null;                    // {bandX, bandY, scale} of the last grab
+  let target = null;                      // {x, y, at} in VIDEO coords (tap-to-focus)
+  const TARGET_TTL_MS = 6000;
 
   function emitReady() { onStatus({ phase: 'ready', text: 'Point at a price' }); }
 
@@ -194,6 +197,7 @@ export function createLens(opts) {
       d[i] = d[i + 1] = d[i + 2] = g;
     }
     ctx.putImageData(img, 0, 0);
+    lastCrop = { bandX, bandY, scale };
     return ocrCanvas;
   }
 
@@ -223,18 +227,39 @@ export function createLens(opts) {
               confidence: l.confidence,
               height: l.bbox ? (l.bbox.y1 - l.bbox.y0) : 0,
               top: l.bbox ? l.bbox.y0 : 0,
+              bbox: l.bbox || null,
             }))
             .sort((a, b) => a.top - b.top) // sparse mode: restore reading order
         : String(data.text || '').split('\n').map((t) => ({ text: t, confidence: data.confidence, height: 0 }));
-      const items = selectPrices(lines, { shopCurrency: shop }).map((sel) => {
+      // Active tap-target? Convert it from video coords into this crop's
+      // coordinate space so nearest-line matching works.
+      let cropTarget = null;
+      if (target && Date.now() - target.at < TARGET_TTL_MS && lastCrop) {
+        cropTarget = {
+          x: (target.x - lastCrop.bandX) * lastCrop.scale,
+          y: (target.y - lastCrop.bandY) * lastCrop.scale,
+        };
+      } else if (target) {
+        target = null; // expired
+      }
+      const crop = lastCrop;
+      const items = selectPrices(lines, { shopCurrency: shop, target: cropTarget }).map((sel) => {
         const from = sel.currency || shop;
         const converted = convert(sel.value, from, home, rates);
         if (!Number.isFinite(converted)) return null;
+        // Map the matched line's bbox back to VIDEO coordinates so the UI
+        // can draw the lock-on box over the live camera.
+        const box = (sel.bbox && crop) ? {
+          x0: crop.bandX + sel.bbox.x0 / crop.scale,
+          y0: crop.bandY + sel.bbox.y0 / crop.scale,
+          x1: crop.bandX + sel.bbox.x1 / crop.scale,
+          y1: crop.bandY + sel.bbox.y1 / crop.scale,
+        } : null;
         return {
           value: sel.value, from, home, converted,
           fromText: formatMoney(sel.value, from),
           homeText: formatMoney(converted, home),
-          raw: sel.raw,
+          raw: sel.raw, box,
         };
       }).filter(Boolean);
       if (items.length) {
@@ -289,14 +314,23 @@ export function createLens(opts) {
     }
   }
 
+  // Camera-style tap-to-focus: hone in on the number nearest this point
+  // (VIDEO coordinates). Active for a few seconds, then size ranking resumes.
+  function setTarget(vx, vy) {
+    target = { x: vx, y: vy, at: Date.now() };
+    // A new intent invalidates the current vote so the switch feels instant.
+    pendingSig = null; pendingVotes = 0;
+  }
+
   // User-facing full restart: fresh camera, fresh OCR worker, clean state.
   async function reset() {
     busy = false;
     await terminate();
     lastGoodAt = 0; staleNotified = false;
     pendingSig = null; pendingVotes = 0;
+    target = null; lastCrop = null;
     return start();
   }
 
-  return { start, stop, terminate, reset, toggleTorch, torchCapable, isRunning: () => running };
+  return { start, stop, terminate, reset, setTarget, toggleTorch, torchCapable, isRunning: () => running };
 }

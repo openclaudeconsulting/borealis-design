@@ -612,11 +612,45 @@ function fillLensSelects() {
   $('lensHome').innerHTML = Object.keys(CURRENCIES).map((c) => `<option value="${c}" ${c === state.home ? 'selected' : ''}>${c}</option>`).join('');
 }
 function lensMsg(html) { const m = $('lensMsg'); m.style.display = html ? 'flex' : 'none'; m.innerHTML = html || ''; }
+
+// The video fills the stage with object-fit: cover — these map between
+// video pixel coordinates and on-screen stage coordinates.
+function lensCoverGeom() {
+  const v = $('lensVideo');
+  const vw = v.videoWidth || 1280, vh = v.videoHeight || 720;
+  const r = lensStage.getBoundingClientRect();
+  const s = Math.max(r.width / vw, r.height / vh);
+  return { s, dx: (r.width - vw * s) / 2, dy: (r.height - vh * s) / 2, rect: r };
+}
+function videoToScreen(x, y) {
+  const g = lensCoverGeom();
+  return { x: g.dx + x * g.s, y: g.dy + y * g.s };
+}
+function screenToVideo(x, y) {
+  const g = lensCoverGeom();
+  return { x: (x - g.dx) / g.s, y: (y - g.dy) / g.s };
+}
+// Position the green lock-on box over a video-space bbox.
+function showLockBox(box) {
+  const el = $('lensLock');
+  if (!box) { el.classList.remove('on'); return; }
+  const a = videoToScreen(box.x0, box.y0);
+  const b = videoToScreen(box.x1, box.y1);
+  const pad = 6;
+  el.style.left = (Math.min(a.x, b.x) - pad) + 'px';
+  el.style.top = (Math.min(a.y, b.y) - pad) + 'px';
+  el.style.width = (Math.abs(b.x - a.x) + pad * 2) + 'px';
+  el.style.height = (Math.abs(b.y - a.y) + pad * 2) + 'px';
+  el.classList.remove('stale');
+  el.classList.add('on');
+}
+function hideLockBox() { $('lensLock').classList.remove('on', 'stale'); }
 function openLens() {
   lensStage.classList.add('on');
   document.body.style.overflow = 'hidden';
   fillLensSelects();
   $('lensResult').style.display = 'none';
+  hideLockBox();
   lensMsg('');
   if (!isSecureCameraContext()) {
     lensMsg(`<div class="glass" style="padding:22px;max-width:340px"><div style="font-size:40px">📷</div>
@@ -640,6 +674,7 @@ function openLens() {
       const card = $('lensResult');
       card.style.display = 'block';
       card.style.opacity = '1';
+      showLockBox(r.box); // green lock-on around the number being converted
       if (r.multi) {
         // Several prices in view (a menu): list them converted, in the same
         // top-to-bottom order they appear on camera.
@@ -656,10 +691,32 @@ function openLens() {
     },
     // The camera moved on but OCR hasn't matched anything new — dim the old
     // number so it reads as "last seen", not "current".
-    onStale: () => { $('lensResult').style.opacity = '0.45'; },
+    onStale: () => {
+      $('lensResult').style.opacity = '0.45';
+      $('lensLock').classList.add('stale');
+    },
   });
   startLensSession();
 }
+// Tap-to-target: tap a number on screen and the scanner hones in on it,
+// like tap-to-focus in the camera app.
+lensStage.addEventListener('pointerdown', (e) => {
+  if (!lens || !lens.isRunning()) return;
+  // Ignore taps on controls, pickers, the result card, and overlays.
+  if (e.target.closest('button, select, label, .lens-result, .lens-top, .lens-bottom, .lens-overlay-msg')) return;
+  const rect = lensStage.getBoundingClientRect();
+  const sx = e.clientX - rect.left, sy = e.clientY - rect.top;
+  // Camera-style focus ping where the finger landed.
+  const ping = $('lensFocus');
+  ping.style.left = sx + 'px';
+  ping.style.top = sy + 'px';
+  ping.classList.remove('ping');
+  void ping.offsetWidth; // restart the animation
+  ping.classList.add('ping');
+  const v = screenToVideo(sx, sy);
+  lens.setTarget(v.x, v.y);
+  $('lensStatus').textContent = 'Focusing…';
+});
 function startLensSession() {
   lens.start().then((okStarted) => {
     if (!okStarted) return;
@@ -681,6 +738,7 @@ function startLensSession() {
     btn.innerHTML = '⏳ Restarting…';
     $('lensStatus').textContent = 'Restarting…';
     $('lensResult').style.display = 'none';
+    hideLockBox();
     lensMsg('');
     try { await lens.reset(); }
     finally {

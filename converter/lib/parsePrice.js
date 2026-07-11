@@ -222,15 +222,21 @@ export function parsePrice(text, opts = {}) {
 const UNIT_PRICE_LINE = /\/\s*\d*\s*(ml|cl|l|g|kg|lb|lbs|oz|ea|un|unit|pc|pcs|each)\b/i;
 
 /**
- * @param {Array<{text:string, confidence?:number, height?:number}>} lines
- *   OCR lines in top-to-bottom order (height = bbox pixel height).
- * @param {object} opts { shopCurrency, maxItems=6, minConfidence=30 }
- * @returns {Array<{value:number, currency:string|null, raw:string, height:number, unitPrice:boolean}>}
+ * @param {Array<{text:string, confidence?:number, height?:number, bbox?:object}>} lines
+ *   OCR lines in top-to-bottom order (height = bbox pixel height; bbox is
+ *   passed through untouched for overlay positioning).
+ * @param {object} opts
+ *   shopCurrency, maxItems=6, minConfidence=30
+ *   target: {x, y} in the same coordinate space as the line bboxes — when
+ *     set (user tapped a spot), the price whose line is NEAREST the target
+ *     is returned alone, overriding size ranking. Camera-style tap-to-focus.
+ * @returns {Array<{value:number, currency:string|null, raw:string, height:number, unitPrice:boolean, bbox:object|null}>}
  */
 export function selectPrices(lines, opts = {}) {
   const maxItems = opts.maxItems || 6;
   const minConf = opts.minConfidence == null ? 30 : opts.minConfidence;
   const items = [];
+  let idx = 0;
   for (const ln of lines || []) {
     if (!ln || !ln.text) continue;
     if (ln.confidence != null && ln.confidence < minConf) continue;
@@ -242,14 +248,39 @@ export function selectPrices(lines, opts = {}) {
       raw: parsed.raw,
       height: ln.height || 0,
       unitPrice: UNIT_PRICE_LINE.test(ln.text),
+      bbox: ln.bbox || null,
+      order: idx++,
     });
   }
   if (!items.length) return [];
-  // Big-print priority (only when heights are known).
+
+  // Tap-to-target: the user pointed at a specific number — honour it above
+  // every other rule and return just that price.
+  if (opts.target && items.some((i) => i.bbox)) {
+    const { x, y } = opts.target;
+    const dist = (i) => {
+      if (!i.bbox) return Infinity;
+      const cx = (i.bbox.x0 + i.bbox.x1) / 2, cy = (i.bbox.y0 + i.bbox.y1) / 2;
+      return Math.hypot(cx - x, cy - y);
+    };
+    items.sort((a, b) => dist(a) - dist(b));
+    return items.slice(0, 1);
+  }
+
+  // PRIMARY RULE — big print wins: on real-world tags the largest numeric
+  // text is almost always THE price. Lines under 60% of the tallest priced
+  // line are dropped, and the remainder is ranked tallest-first (heights
+  // within 15% count as equal so equal-size menus keep reading order).
   const maxH = Math.max(...items.map((i) => i.height));
-  let kept = maxH > 0 ? items.filter((i) => i.height >= 0.55 * maxH) : items;
+  let kept = maxH > 0 ? items.filter((i) => i.height >= 0.6 * maxH) : items;
   // The main price beats per-unit small print.
   if (kept.some((i) => !i.unitPrice)) kept = kept.filter((i) => !i.unitPrice);
+  if (maxH > 0) {
+    kept.sort((a, b) => {
+      if (Math.abs(a.height - b.height) <= 0.15 * maxH) return a.order - b.order;
+      return b.height - a.height;
+    });
+  }
   return kept.slice(0, maxItems);
 }
 
