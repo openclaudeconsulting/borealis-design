@@ -1747,18 +1747,23 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
 <script>
   // Guarantee content is visible even if the animation library fails/stalls.
+  var __revealDone = false;
   function revealAllContent() {
+    if (__revealDone) return;
+    __revealDone = true;
     document.querySelectorAll('.reveal').forEach(function (el) {
       el.style.opacity = 1; el.style.transform = 'none';
     });
   }
-  // Safety net regardless of what happens below.
-  setTimeout(revealAllContent, 2500);
+  // Safety net: only reveal if GSAP hasn't taken over. On the normal path GSAP
+  // disarms this immediately, so it never fires (and never causes a reflow).
+  setTimeout(function () { if (!__revealDone) revealAllContent(); }, 3000);
 
   if (!window.gsap || !window.ScrollTrigger) {
     // Animation library unavailable — show everything immediately, no freeze.
     revealAllContent();
   } else {
+  __revealDone = true; // GSAP is present and will drive the reveals — disarm fallback.
   // ===== GSAP setup =====
   gsap.registerPlugin(ScrollTrigger);
 
@@ -1792,23 +1797,14 @@
   );
 
   // ===== Reveal on scroll =====
-  gsap.utils.toArray('.reveal').forEach((el) => {
-    if (el.hasAttribute('data-stagger')) return; // hero handled separately
-    gsap.fromTo(el,
-      { opacity: 0, y: 40 },
-      {
-        opacity: 1,
-        y: 0,
-        duration: 1,
-        ease: 'power3.out',
-        overwrite: 'auto',
-        scrollTrigger: {
-          trigger: el,
-          start: 'top 88%',
-          toggleActions: 'play none none reverse',
-        },
-      }
-    );
+  // One batched trigger (shared IntersectionObserver) for all reveal elements
+  // instead of ~40 individual ScrollTriggers — far cheaper to initialise, so
+  // load no longer stalls the main thread.
+  const revealEls = gsap.utils.toArray('.reveal').filter((el) => !el.hasAttribute('data-stagger'));
+  ScrollTrigger.batch(revealEls, {
+    start: 'top 88%',
+    onEnter: (batch) => gsap.to(batch, { opacity: 1, y: 0, duration: 1, ease: 'power3.out', stagger: 0.08, overwrite: 'auto' }),
+    onLeaveBack: (batch) => gsap.to(batch, { opacity: 0, y: 40, duration: 0.4, overwrite: 'auto' }),
   });
 
   // ===== Process timeline draw =====
