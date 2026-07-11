@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Borealis Converter — Currency in your native tongue.</title>
+<meta name="description" content="A fast, friendly currency converter by Borealis Design. Phase one of a live camera overlay that prices the world around you in your home currency." />
+<meta name="theme-color" content="#07060d" />
+
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<link rel="apple-touch-icon" href="/favicon.svg" />
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet" />
+
+<script src="https://cdn.tailwindcss.com"></script>
+
+<style>
+  :root {
+    --bg: #07060d;
+    --bg-2: #0c0a18;
+    --fg: #f5f3ff;
+    --muted: #9b97b3;
+    --border: rgba(255, 255, 255, 0.08);
+    --border-strong: rgba(255, 255, 255, 0.16);
+    --aurora-1: #ff4d8d;   /* magenta */
+    --aurora-2: #a855f7;   /* purple */
+    --aurora-3: #4f7cff;   /* blue   */
+    --aurora-4: #22d3ee;   /* cyan   */
+    --aurora-5: #fbbf24;   /* gold   */
+    --aurora-6: #34d399;   /* mint   */
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
+  }
+  .serif { font-family: 'Instrument Serif', 'Times New Roman', serif; font-weight: 400; font-style: italic; }
+
+  /* ========== Aurora background blobs ========== */
+  .aurora-stage { position: fixed; inset: 0; overflow: hidden; z-index: 0; pointer-events: none; }
+  .aurora-blob {
+    position: absolute; border-radius: 50%; filter: blur(120px);
+    opacity: 0.5; mix-blend-mode: screen; will-change: transform;
+  }
+  .aurora-blob.b1 { background: var(--aurora-1); width: 620px; height: 620px; top: -160px; left: -180px; animation: float1 18s ease-in-out infinite alternate; }
+  .aurora-blob.b2 { background: var(--aurora-2); width: 720px; height: 720px; top: 40px;   right: -240px; animation: float2 22s ease-in-out infinite alternate; }
+  .aurora-blob.b3 { background: var(--aurora-3); width: 560px; height: 560px; bottom: -180px; left: 26%;  animation: float3 20s ease-in-out infinite alternate; }
+  .aurora-blob.b4 { background: var(--aurora-4); width: 420px; height: 420px; top: 44%;  left: 54%; animation: float4 24s ease-in-out infinite alternate; }
+
+  @keyframes float1 { from { transform: translate(0,0) scale(1); }   to { transform: translate(200px, 120px) scale(1.2); } }
+  @keyframes float2 { from { transform: translate(0,0) scale(1); }   to { transform: translate(-180px, 200px) scale(0.9); } }
+  @keyframes float3 { from { transform: translate(0,0) scale(1); }   to { transform: translate(160px, -200px) scale(1.15); } }
+  @keyframes float4 { from { transform: translate(0,0) scale(1); }   to { transform: translate(-200px, -120px) scale(1.3); } }
+
+  .noise {
+    position: fixed; inset: 0; pointer-events: none; opacity: 0.05; z-index: 1;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.6'/%3E%3C/svg%3E");
+    mix-blend-mode: overlay;
+  }
+
+  /* ========== Frosted nav ========== */
+  .nav-glass {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 50;
+    backdrop-filter: blur(28px) saturate(200%) brightness(1.05);
+    -webkit-backdrop-filter: blur(28px) saturate(200%) brightness(1.05);
+    background: linear-gradient(180deg, rgba(7,6,13,0.55) 0%, rgba(7,6,13,0.35) 100%);
+    box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.10), 0 1px 0 0 rgba(0, 0, 0, 0.20);
+  }
+
+  /* ========== Glass card ========== */
+  .glass-card {
+    position: relative;
+    border-radius: 28px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.055), rgba(255,255,255,0.015));
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    border: 1px solid var(--border);
+    box-shadow:
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.14),
+      inset 0 -1px 0 0 rgba(0, 0, 0, 0.20),
+      0 24px 70px -20px rgba(0, 0, 0, 0.6);
+  }
+
+  /* ========== Buttons ========== */
+  .btn-primary {
+    position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+    padding: 16px 28px; border-radius: 999px; font-weight: 500; color: #0b0a14; border: 0; cursor: pointer;
+    background: linear-gradient(120deg, var(--aurora-4), var(--aurora-2), var(--aurora-1));
+    background-size: 200% 200%;
+    transition: transform 0.3s cubic-bezier(0.2, 0.9, 0.3, 1), background-position 0.6s ease, box-shadow 0.4s ease;
+    box-shadow: 0 8px 40px -8px rgba(168, 85, 247, 0.5);
+  }
+  .btn-primary:hover { background-position: 100% 50%; box-shadow: 0 12px 50px -8px rgba(255, 77, 141, 0.6); transform: translateY(-1px); }
+  .btn-primary:active { transform: translateY(0); }
+
+  .btn-ghost {
+    position: relative; display: inline-flex; align-items: center; gap: 10px;
+    padding: 12px 20px; border-radius: 999px; font-weight: 500; color: var(--fg); cursor: pointer;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.015));
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    transition: background 0.3s ease, border-color 0.3s ease, transform 0.3s ease;
+    text-decoration: none;
+  }
+  .btn-ghost:hover { background: linear-gradient(180deg, rgba(255,255,255,0.10), rgba(255,255,255,0.03)); border-color: rgba(255, 255, 255, 0.28); }
+
+  /* ========== Form fields ========== */
+  .field-label { font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+
+  .amount-input {
+    width: 100%; background: transparent; border: 0; outline: 0; color: var(--fg);
+    font-family: 'Inter', sans-serif; font-weight: 700; font-size: clamp(2rem, 8vw, 3.25rem);
+    line-height: 1; letter-spacing: -0.02em; padding: 0; -moz-appearance: textfield;
+  }
+  .amount-input::-webkit-outer-spin-button,
+  .amount-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .amount-input::placeholder { color: rgba(155,151,179,0.4); }
+
+  .cur-select {
+    appearance: none; -webkit-appearance: none;
+    background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02));
+    border: 1px solid var(--border-strong); color: var(--fg);
+    border-radius: 16px; padding: 12px 40px 12px 16px; font-size: 15px; font-weight: 600;
+    cursor: pointer; outline: 0; width: 100%;
+    transition: border-color 0.25s ease, background 0.25s ease;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none'%3E%3Cpath d='M6 9l6 6 6-6' stroke='%239b97b3' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 14px center;
+  }
+  .cur-select:hover { border-color: rgba(255,255,255,0.3); }
+  .cur-select:focus { border-color: var(--aurora-2); }
+  .cur-select option { background: var(--bg-2); color: var(--fg); }
+
+  .swap-btn {
+    display: grid; place-items: center; width: 52px; height: 52px; border-radius: 999px; cursor: pointer;
+    border: 1px solid var(--border-strong); color: var(--fg);
+    background: linear-gradient(180deg, rgba(255,255,255,0.10), rgba(255,255,255,0.02));
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    transition: transform 0.4s cubic-bezier(0.2,0.9,0.3,1), border-color 0.25s ease, background 0.25s ease;
+  }
+  .swap-btn:hover { border-color: rgba(255,255,255,0.3); background: linear-gradient(180deg, rgba(255,255,255,0.16), rgba(255,255,255,0.04)); }
+  .swap-btn.spin svg { transform: rotate(180deg); }
+  .swap-btn svg { transition: transform 0.4s cubic-bezier(0.2,0.9,0.3,1); }
+
+  .result-value {
+    font-weight: 800; font-size: clamp(2.4rem, 9vw, 4rem); line-height: 1;
+    letter-spacing: -0.03em;
+    background: linear-gradient(120deg, var(--aurora-4), var(--aurora-2), var(--aurora-1));
+    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  }
+
+  .rate-pill {
+    display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted);
+    padding: 7px 14px; border-radius: 999px; border: 1px solid var(--border);
+    background: rgba(255,255,255,0.03);
+  }
+  .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--aurora-6); box-shadow: 0 0 0 0 rgba(52,211,153,0.6); animation: pulse 2.2s ease-out infinite; }
+  .live-dot.stale { background: var(--aurora-5); animation: none; box-shadow: none; }
+  @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(52,211,153,0.5);} 70% { box-shadow: 0 0 0 8px rgba(52,211,153,0);} 100% { box-shadow: 0 0 0 0 rgba(52,211,153,0);} }
+
+  .quick-chip {
+    font-size: 13px; font-weight: 600; color: var(--muted); cursor: pointer;
+    padding: 8px 14px; border-radius: 999px; border: 1px solid var(--border);
+    background: rgba(255,255,255,0.02); transition: all 0.2s ease;
+  }
+  .quick-chip:hover { color: var(--fg); border-color: rgba(255,255,255,0.24); background: rgba(255,255,255,0.06); }
+
+  ::selection { background: var(--aurora-2); color: #fff; }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.18); }
+
+  .fade-up { animation: fadeUp 0.7s cubic-bezier(0.2,0.9,0.3,1) both; }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
+</style>
+</head>
+<body>
+
+<div class="aurora-stage">
+  <span class="aurora-blob b1"></span>
+  <span class="aurora-blob b2"></span>
+  <span class="aurora-blob b3"></span>
+  <span class="aurora-blob b4"></span>
+</div>
+<div class="noise"></div>
+
+<!-- ========== NAV ========== -->
+<nav class="nav-glass px-6 md:px-10 py-4">
+  <div class="max-w-5xl mx-auto flex items-center justify-between">
+    <a href="/" class="flex items-center gap-3 group">
+      <span class="relative w-9 h-9 grid place-items-center">
+        <span class="absolute inset-0 rounded-xl" style="background: conic-gradient(from 0deg, var(--aurora-1), var(--aurora-2), var(--aurora-3), var(--aurora-4), var(--aurora-1)); filter: blur(8px); opacity: 0.7;"></span>
+        <span class="absolute inset-[3px] rounded-[10px] bg-[var(--bg)]"></span>
+        <svg class="relative" width="18" height="18" viewBox="0 0 24 24" fill="none">
+          <path d="M3 18 Q6 6 12 12 T 21 6" stroke="white" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </span>
+      <span class="font-semibold tracking-tight text-[17px]">Borealis<span class="text-[var(--muted)] font-light">&nbsp;Converter</span></span>
+    </a>
+    <a href="/" class="btn-ghost text-sm">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M19 12H5M11 18l-6-6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Back to studio
+    </a>
+  </div>
+</nav>
+
+<!-- ========== MAIN ========== -->
+<main class="relative z-10 px-6 md:px-10 pt-32 md:pt-40 pb-24">
+  <div class="max-w-2xl mx-auto">
+
+    <!-- Heading -->
+    <div class="text-center fade-up">
+      <span class="rate-pill mb-6"><span class="live-dot"></span>Phase 01 · Live rates</span>
+      <h1 class="text-4xl md:text-6xl font-bold tracking-tight leading-[1.05] mt-6">
+        Money, <span class="serif">in your</span> native tongue.
+      </h1>
+      <p class="text-[var(--muted)] text-lg mt-5 max-w-lg mx-auto">
+        Type an amount, pick two currencies, and see the honest number — the same conversion that will one day float over everything your camera sees.
+      </p>
+    </div>
+
+    <!-- Converter card -->
+    <div class="glass-card p-6 md:p-8 mt-12 fade-up" style="animation-delay: 0.1s;">
+
+      <!-- FROM -->
+      <div class="rounded-2xl p-5 md:p-6" style="background: rgba(0,0,0,0.18); border: 1px solid var(--border);">
+        <div class="flex items-center justify-between mb-3">
+          <span class="field-label">You have</span>
+          <span id="fromName" class="text-xs text-[var(--muted)]">US Dollar</span>
+        </div>
+        <div class="flex items-center gap-4">
+          <input id="amount" class="amount-input" type="number" inputmode="decimal" min="0" step="any" value="100" placeholder="0" aria-label="Amount to convert" />
+          <div class="shrink-0 w-[150px] md:w-[168px]">
+            <select id="fromCur" class="cur-select" aria-label="Convert from currency"></select>
+          </div>
+        </div>
+      </div>
+
+      <!-- SWAP -->
+      <div class="flex justify-center -my-3 relative z-10">
+        <button id="swapBtn" class="swap-btn" aria-label="Swap currencies">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M7 4v13M7 4L3 8M7 4l4 4M17 20V7M17 20l4-4M17 20l-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </div>
+
+      <!-- TO -->
+      <div class="rounded-2xl p-5 md:p-6" style="background: rgba(0,0,0,0.18); border: 1px solid var(--border);">
+        <div class="flex items-center justify-between mb-3">
+          <span class="field-label">They want</span>
+          <span id="toName" class="text-xs text-[var(--muted)]">Euro</span>
+        </div>
+        <div class="flex items-center gap-4">
+          <div class="flex-1 min-w-0">
+            <div id="result" class="result-value truncate">€0.00</div>
+          </div>
+          <div class="shrink-0 w-[150px] md:w-[168px]">
+            <select id="toCur" class="cur-select" aria-label="Convert to currency"></select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Rate + status -->
+      <div class="flex flex-wrap items-center justify-between gap-3 mt-6">
+        <span id="rateInfo" class="rate-pill"><span id="statusDot" class="live-dot"></span><span id="rateText">Fetching rates…</span></span>
+        <span id="updated" class="text-xs text-[var(--muted)]"></span>
+      </div>
+    </div>
+
+    <!-- Quick amounts -->
+    <div class="flex flex-wrap items-center justify-center gap-2 mt-6 fade-up" style="animation-delay: 0.16s;">
+      <span class="text-xs text-[var(--muted)] mr-1">Quick:</span>
+      <button class="quick-chip" data-amt="1">1</button>
+      <button class="quick-chip" data-amt="5">5</button>
+      <button class="quick-chip" data-amt="20">20</button>
+      <button class="quick-chip" data-amt="50">50</button>
+      <button class="quick-chip" data-amt="100">100</button>
+    </div>
+
+    <!-- Phase two teaser -->
+    <div class="glass-card p-6 md:p-8 mt-14 fade-up" style="animation-delay: 0.22s;">
+      <div class="flex items-start gap-5">
+        <div class="shrink-0 w-14 h-14 rounded-2xl grid place-items-center" style="background: linear-gradient(180deg, rgba(255,255,255,0.10), rgba(255,255,255,0.02)); border: 1px solid var(--border-strong);">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M4 8a2 2 0 0 1 2-2h1l1.2-1.6A1 1 0 0 1 9 4h6a1 1 0 0 1 .8.4L17 6h1a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8Z" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="12.5" r="3.2" stroke="currentColor" stroke-width="1.6"/></svg>
+        </div>
+        <div>
+          <div class="flex items-center gap-2 mb-1.5">
+            <h2 class="text-xl font-semibold">Next: point &amp; price</h2>
+            <span class="text-[11px] font-semibold tracking-wide uppercase px-2 py-0.5 rounded-full" style="color: var(--aurora-4); border: 1px solid rgba(34,211,238,0.35); background: rgba(34,211,238,0.08);">Phase 02</span>
+          </div>
+          <p class="text-[var(--muted)] leading-relaxed">
+            Walk a foreign grocery aisle and hold up your phone. Borealis reads every price tag through the camera and overlays it — live — in your home currency. No photos, no typing, no math. Just travel that finally speaks your language.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <p class="text-center text-xs text-[var(--muted)] mt-10 fade-up" style="animation-delay: 0.28s;">
+      Rates are indicative and for reference only. A Borealis Design experiment.
+    </p>
+
+  </div>
+</main>
+
+<script>
+/* ============================================================
+   Borealis Converter — Phase 01
+   Live rates via Frankfurter (no key). Offline fallback baked in.
+   ============================================================ */
+
+// Currency metadata: symbol + flag for a friendlier UI.
+const CURRENCIES = {
+  USD: { name: 'US Dollar',            symbol: '$',   flag: '🇺🇸' },
+  EUR: { name: 'Euro',                 symbol: '€',   flag: '🇪🇺' },
+  GBP: { name: 'British Pound',        symbol: '£',   flag: '🇬🇧' },
+  JPY: { name: 'Japanese Yen',         symbol: '¥',   flag: '🇯🇵' },
+  CNY: { name: 'Chinese Yuan',         symbol: '¥',   flag: '🇨🇳' },
+  AUD: { name: 'Australian Dollar',    symbol: 'A$',  flag: '🇦🇺' },
+  CAD: { name: 'Canadian Dollar',      symbol: 'C$',  flag: '🇨🇦' },
+  CHF: { name: 'Swiss Franc',          symbol: 'Fr',  flag: '🇨🇭' },
+  INR: { name: 'Indian Rupee',         symbol: '₹',   flag: '🇮🇳' },
+  MXN: { name: 'Mexican Peso',         symbol: 'Mex$',flag: '🇲🇽' },
+  BRL: { name: 'Brazilian Real',       symbol: 'R$',  flag: '🇧🇷' },
+  KRW: { name: 'South Korean Won',     symbol: '₩',   flag: '🇰🇷' },
+  SGD: { name: 'Singapore Dollar',     symbol: 'S$',  flag: '🇸🇬' },
+  HKD: { name: 'Hong Kong Dollar',     symbol: 'HK$', flag: '🇭🇰' },
+  NZD: { name: 'New Zealand Dollar',   symbol: 'NZ$', flag: '🇳🇿' },
+  SEK: { name: 'Swedish Krona',        symbol: 'kr',  flag: '🇸🇪' },
+  NOK: { name: 'Norwegian Krone',      symbol: 'kr',  flag: '🇳🇴' },
+  DKK: { name: 'Danish Krone',         symbol: 'kr',  flag: '🇩🇰' },
+  PLN: { name: 'Polish Złoty',         symbol: 'zł',  flag: '🇵🇱' },
+  THB: { name: 'Thai Baht',            symbol: '฿',   flag: '🇹🇭' },
+  ZAR: { name: 'South African Rand',   symbol: 'R',   flag: '🇿🇦' },
+  TRY: { name: 'Turkish Lira',         symbol: '₺',   flag: '🇹🇷' },
+  AED: { name: 'UAE Dirham',           symbol: 'د.إ', flag: '🇦🇪' },
+  PHP: { name: 'Philippine Peso',      symbol: '₱',   flag: '🇵🇭' },
+};
+
+// Offline fallback rates (base USD). Approximate — used only if the live fetch fails.
+const FALLBACK_RATES = {
+  USD: 1, EUR: 0.92, GBP: 0.79, JPY: 157, CNY: 7.24, AUD: 1.50, CAD: 1.36,
+  CHF: 0.89, INR: 83.3, MXN: 17.1, BRL: 5.43, KRW: 1370, SGD: 1.34, HKD: 7.81,
+  NZD: 1.63, SEK: 10.5, NOK: 10.7, DKK: 6.86, PLN: 3.97, THB: 36.2, ZAR: 18.4,
+  TRY: 32.2, AED: 3.67, PHP: 57.5,
+};
+
+// USD-based rate table. rates[X] = units of X per 1 USD.
+let rates = { ...FALLBACK_RATES };
+let ratesLive = false;
+let ratesDate = null;
+
+const $ = (id) => document.getElementById(id);
+const fromCur = $('fromCur');
+const toCur   = $('toCur');
+const amount  = $('amount');
+
+function populateSelects() {
+  const opts = Object.keys(CURRENCIES).map((code) => {
+    const c = CURRENCIES[code];
+    return `<option value="${code}">${c.flag}  ${code} · ${c.name}</option>`;
+  }).join('');
+  fromCur.innerHTML = opts;
+  toCur.innerHTML = opts;
+  fromCur.value = 'USD';
+  toCur.value = 'EUR';
+}
+
+function formatMoney(value, code) {
+  const c = CURRENCIES[code];
+  // Currencies conventionally shown without decimal places.
+  const zeroDecimal = ['JPY', 'KRW'].includes(code);
+  try {
+    return new Intl.NumberFormat(undefined, {
+      style: 'currency', currency: code,
+      minimumFractionDigits: zeroDecimal ? 0 : 2,
+      maximumFractionDigits: zeroDecimal ? 0 : 2,
+    }).format(value);
+  } catch (e) {
+    // Fallback if Intl lacks the currency.
+    const digits = zeroDecimal ? 0 : 2;
+    return (c ? c.symbol : '') + value.toLocaleString(undefined, { minimumFractionDigits: digits, maximumFractionDigits: digits });
+  }
+}
+
+function convert() {
+  const from = fromCur.value;
+  const to = toCur.value;
+  const amt = parseFloat(amount.value);
+
+  $('fromName').textContent = CURRENCIES[from].name;
+  $('toName').textContent = CURRENCIES[to].name;
+
+  if (!isFinite(amt) || amt < 0) {
+    $('result').textContent = formatMoney(0, to);
+  } else {
+    // Convert through USD base: amt in `from` -> USD -> `to`.
+    const usd = amt / rates[from];
+    const out = usd * rates[to];
+    $('result').textContent = formatMoney(out, to);
+  }
+
+  // Single-unit exchange rate line.
+  const unitRate = rates[to] / rates[from];
+  $('rateText').textContent = `1 ${from} = ${unitRate.toLocaleString(undefined, { maximumFractionDigits: 4 })} ${to}`;
+}
+
+function updateStatus() {
+  const dot = $('statusDot');
+  if (ratesLive) {
+    dot.classList.remove('stale');
+    $('updated').textContent = ratesDate ? `Updated ${ratesDate}` : 'Live rates';
+  } else {
+    dot.classList.add('stale');
+    $('updated').textContent = 'Offline reference rates';
+  }
+}
+
+async function fetchRates() {
+  // Frankfurter serves ECB reference rates, base-selectable, no API key.
+  try {
+    const res = await fetch('https://api.frankfurter.dev/v1/latest?base=USD');
+    if (!res.ok) throw new Error('bad status ' + res.status);
+    const data = await res.json();
+    if (!data || !data.rates) throw new Error('malformed response');
+
+    const next = { USD: 1 };
+    for (const code of Object.keys(CURRENCIES)) {
+      if (code === 'USD') continue;
+      if (typeof data.rates[code] === 'number') next[code] = data.rates[code];
+      else next[code] = FALLBACK_RATES[code]; // keep any currency the feed omits
+    }
+    rates = next;
+    ratesLive = true;
+    ratesDate = data.date || null;
+  } catch (err) {
+    // Network blocked or offline — the fallback table already covers us.
+    rates = { ...FALLBACK_RATES };
+    ratesLive = false;
+    console.warn('Live rates unavailable, using fallback:', err.message);
+  }
+  updateStatus();
+  convert();
+}
+
+function swap() {
+  const a = fromCur.value;
+  fromCur.value = toCur.value;
+  toCur.value = a;
+  $('swapBtn').classList.toggle('spin');
+  convert();
+}
+
+// ---- Wire up ----
+populateSelects();
+convert();
+updateStatus();
+
+amount.addEventListener('input', convert);
+fromCur.addEventListener('change', convert);
+toCur.addEventListener('change', convert);
+$('swapBtn').addEventListener('click', swap);
+document.querySelectorAll('.quick-chip').forEach((chip) => {
+  chip.addEventListener('click', () => { amount.value = chip.dataset.amt; convert(); });
+});
+
+fetchRates();
+</script>
+
+</body>
+</html>
