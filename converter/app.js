@@ -576,8 +576,19 @@ function openLens() {
       const card = $('lensResult');
       card.style.display = 'block';
       card.style.opacity = '1';
-      $('lensConv').textContent = r.homeText;
-      $('lensSrc').textContent = `${r.fromText} ${r.from} → ${r.home}`;
+      if (r.multi) {
+        // Several prices in view (a menu): list them converted, in the same
+        // top-to-bottom order they appear on camera.
+        $('lensConv').innerHTML = r.items.map((it) => `
+          <div style="display:flex;align-items:baseline;justify-content:space-between;gap:16px;padding:3px 0">
+            <span style="font-size:15px;opacity:.65;font-weight:600">${it.fromText}</span>
+            <span style="font-size:24px;font-weight:800">${it.homeText}</span>
+          </div>`).join('');
+        $('lensSrc').textContent = `${r.items.length} prices · ${r.items[0].from} → ${r.items[0].home}`;
+      } else {
+        $('lensConv').textContent = r.homeText;
+        $('lensSrc').textContent = `${r.fromText} ${r.from} → ${r.home}`;
+      }
     },
     // The camera moved on but OCR hasn't matched anything new — dim the old
     // number so it reads as "last seen", not "current".
@@ -598,10 +609,21 @@ function startLensSession() {
   });
   // Full restart escape hatch — fresh camera, fresh OCR worker, clean state.
   $('lensReset').onclick = async () => {
+    const btn = $('lensReset');
+    if (btn.disabled) return;
+    const original = btn.innerHTML;
+    btn.disabled = true;
+    btn.style.opacity = '.6';
+    btn.innerHTML = '⏳ Restarting…';
     $('lensStatus').textContent = 'Restarting…';
     $('lensResult').style.display = 'none';
     lensMsg('');
-    await lens.reset();
+    try { await lens.reset(); }
+    finally {
+      btn.disabled = false;
+      btn.style.opacity = '';
+      btn.innerHTML = original;
+    }
     const tb = $('lensTorch');
     if (lens.torchCapable()) { tb.style.display = 'grid'; tb.style.opacity = '.6'; }
     else tb.style.display = 'none';

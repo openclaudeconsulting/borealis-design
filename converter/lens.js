@@ -58,7 +58,6 @@ export function createLens(opts) {
 
   let stream = null, worker = null, running = false, busy = false, timer = null;
   let track = null, torchOn = false;
-  let lastValue = null, lastStableCount = 0;
   let lastGoodAt = 0, staleNotified = false;
 
   function emitReady() { onStatus({ phase: 'ready', text: 'Point at a price' }); }
@@ -79,10 +78,11 @@ export function createLens(opts) {
         }
       },
     });
-    // Bias OCR toward price glyphs; treat the crop as a single text line.
+    // Bias OCR toward price glyphs; read the crop as a block of lines so a
+    // menu with several prices yields one result per line, in order.
     await w.setParameters({
       tessedit_char_whitelist: '0123456789.,€£$¥₩₹฿ CHFkrRp',
-      tessedit_pageseg_mode: '7', // single line
+      tessedit_pageseg_mode: '6', // uniform block of text
     });
     worker = w;
     emitReady();
@@ -166,12 +166,14 @@ export function createLens(opts) {
   }
 
   // Grab the reticle band, upscale + greyscale + contrast-stretch for OCR.
+  // Keep these fractions in sync with the .reticle CSS so the on-screen box
+  // matches exactly what is scanned.
   function grabReticle() {
     const vw = video.videoWidth, vh = video.videoHeight;
     if (!vw || !vh) return null;
     const bandX = vw * 0.08, bandW = vw * 0.84;
-    const bandY = vh * 0.40, bandH = vh * 0.20;
-    const scale = 2;
+    const bandY = vh * 0.32, bandH = vh * 0.36;
+    const scale = 1.5;
     ocrCanvas.width = Math.round(bandW * scale);
     ocrCanvas.height = Math.round(bandH * scale);
     const ctx = ocrCanvas.getContext('2d', { willReadFrequently: true });
@@ -203,26 +205,39 @@ export function createLens(opts) {
       ]);
       const { data } = rec;
       const shop = getShopCurrency();
-      const parsed = parsePrice(data.text, { shopCurrency: shop });
-      if (parsed && parsed.value > 0 && data.confidence >= 35) {
+      const home = getHomeCurrency();
+      const rates = getRates();
+      // Parse every OCR line separately: a menu with several prices yields
+      // one converted entry per line, preserved in top-to-bottom order.
+      const lines = (data.lines && data.lines.length)
+        ? data.lines
+        : String(data.text || '').split('\n').map((t) => ({ text: t, confidence: data.confidence }));
+      const items = [];
+      for (const ln of lines) {
+        if (!ln.text) continue;
+        if (ln.confidence != null && ln.confidence < 30) continue;
+        const parsed = parsePrice(ln.text, { shopCurrency: shop });
+        if (!parsed || !(parsed.value > 0)) continue;
         const from = parsed.currency || shop;
-        const home = getHomeCurrency();
-        const rates = getRates();
         const converted = convert(parsed.value, from, home, rates);
-        // Require the same reading twice to reduce OCR jitter before surfacing.
-        const key = from + ':' + parsed.value;
-        if (key === lastValue) lastStableCount++; else { lastValue = key; lastStableCount = 1; }
-        if (lastStableCount >= 1 && Number.isFinite(converted)) {
-          lastGoodAt = Date.now();
-          staleNotified = false;
-          onResult({
-            value: parsed.value, from, home, converted,
-            fromText: formatMoney(parsed.value, from),
-            homeText: formatMoney(converted, home),
-            confidence: Math.round(data.confidence),
-            raw: parsed.raw,
-          });
-        }
+        if (!Number.isFinite(converted)) continue;
+        items.push({
+          value: parsed.value, from, home, converted,
+          fromText: formatMoney(parsed.value, from),
+          homeText: formatMoney(converted, home),
+          raw: parsed.raw,
+        });
+        if (items.length >= 6) break; // keep the overlay readable
+      }
+      if (items.length) {
+        lastGoodAt = Date.now();
+        staleNotified = false;
+        onResult({
+          items,
+          multi: items.length > 1,
+          ...items[0], // single-price consumers keep working unchanged
+          confidence: Math.round(data.confidence),
+        });
       }
     } catch (err) {
       if (err && err.message === 'ocr-timeout') await recoverWorker();
@@ -249,13 +264,19 @@ export function createLens(opts) {
 
   async function terminate() {
     await stop();
-    if (worker) { try { await worker.terminate(); } catch {} worker = null; }
+    if (worker) {
+      // A wedged worker may never resolve terminate() — don't let it hold
+      // Reset hostage; hard-abandon it after 2.5s.
+      const dead = worker; worker = null;
+      try { await Promise.race([dead.terminate(), new Promise((r) => setTimeout(r, 2500))]); } catch {}
+    }
   }
 
   // User-facing full restart: fresh camera, fresh OCR worker, clean state.
   async function reset() {
+    busy = false;
     await terminate();
-    lastValue = null; lastStableCount = 0; lastGoodAt = 0; staleNotified = false;
+    lastGoodAt = 0; staleNotified = false;
     return start();
   }
 
