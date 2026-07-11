@@ -32,6 +32,7 @@ const state = {
   dest: store.get('dest', null), // country code — the trip destination
   rates: { ...FALLBACK_RATES }, ratesLive: false, ratesDate: null,
   wallet: store.get('wallet', []),
+  cvHistory: store.get('cvHistory', []),
 };
 function setHome(c) { state.home = c; store.set('home', c); }
 function setShop(c) { state.shop = c; store.set('shop', c); }
@@ -197,10 +198,68 @@ function viewConvert() {
       <span class="muted" style="font-size:12px;align-self:center">Quick:</span>
       ${[1,5,20,50,100].map((a) => `<button class="chip" data-amt="${a}">${a}</button>`).join('')}
     </div>
+    <div style="margin-top:24px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;padding:0 2px">
+        <span class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.14em;font-weight:700;opacity:.6">History</span>
+        <button class="chip" id="cvHistClear" style="font-size:12px;padding:6px 12px">Clear</button>
+      </div>
+      <div class="glass" id="cvHist" style="padding:4px 16px"></div>
+    </div>
   </div>`;
   function mount() {
     const amount = $('cvAmount'), from = $('cvFrom'), to = $('cvTo');
     from.innerHTML = currencyOptions(state.shop); to.innerHTML = currencyOptions(state.home);
+
+    const timeAgo = (ts) => {
+      const d = Date.now() - ts;
+      if (d < 60e3) return 'just now';
+      if (d < 3600e3) return Math.floor(d / 60e3) + 'm ago';
+      if (d < 86400e3) return Math.floor(d / 3600e3) + 'h ago';
+      return new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    };
+    const renderHist = () => {
+      const h = state.cvHistory;
+      $('cvHistClear').style.display = h.length ? '' : 'none';
+      $('cvHist').innerHTML = h.length ? h.map((e, i) => `
+        <button class="cvh-row" data-h="${i}" style="display:flex;align-items:center;gap:12px;width:100%;padding:12px 0;border:0;background:transparent;color:#fff;cursor:pointer;text-align:left;font-family:inherit;border-bottom:1px solid var(--border)">
+          <span style="flex:1;min-width:0;font-size:14.5px;font-weight:600">${e.amount.toLocaleString()} ${e.from} → <strong>${esc(e.result)}</strong></span>
+          <span class="muted" style="font-size:11.5px;flex:0 0 auto">${timeAgo(e.ts)}</span>
+        </button>`).join('')
+        : `<p class="muted" style="font-size:13px;padding:12px 0;margin:0;text-align:center">Your conversions will appear here.</p>`;
+      $('cvHist').querySelectorAll('.cvh-row').forEach((b) => {
+        if (b.nextElementSibling === null) b.style.borderBottom = '0';
+        b.addEventListener('click', () => {
+          const e = state.cvHistory[num(b.dataset.h)];
+          if (!e) return;
+          interacted = true; // re-referencing bumps the entry back to the top
+          amount.value = e.amount; from.value = e.from; to.value = e.to;
+          calc();
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+      });
+    };
+    // Record a conversion once the user settles (not per keystroke); skip
+    // repeats of the most recent entry. Only user actions record — mounting
+    // the view must never write a phantom entry.
+    let interacted = false;
+    let histTimer = null;
+    const scheduleRecord = () => {
+      if (!interacted) return;
+      if (histTimer) clearTimeout(histTimer);
+      histTimer = setTimeout(() => {
+        const a = num(amount.value);
+        if (!Number.isFinite(a) || a <= 0) return;
+        const out = convert(a, from.value, to.value, state.rates);
+        if (!Number.isFinite(out)) return;
+        const last = state.cvHistory[0];
+        if (last && last.amount === a && last.from === from.value && last.to === to.value) return;
+        state.cvHistory.unshift({ amount: a, from: from.value, to: to.value, result: formatMoney(out, to.value), ts: Date.now() });
+        state.cvHistory = state.cvHistory.slice(0, 20);
+        store.set('cvHistory', state.cvHistory);
+        renderHist();
+      }, 1200);
+    };
+
     const calc = () => {
       $('cvFromName').textContent = CURRENCIES[from.value].name;
       $('cvToName').textContent = CURRENCIES[to.value].name;
@@ -209,12 +268,17 @@ function viewConvert() {
       const r = unitRate(from.value, to.value, state.rates);
       $('cvRate').textContent = `1 ${from.value} = ${r.toLocaleString(undefined, { maximumFractionDigits: 4 })} ${to.value}`;
       setShop(from.value); setHome(to.value);
+      scheduleRecord();
     };
-    amount.addEventListener('input', calc);
-    from.addEventListener('change', calc); to.addEventListener('change', calc);
-    $('cvSwap').addEventListener('click', () => { const a = from.value; from.value = to.value; to.value = a; $('cvSwap').classList.toggle('spin'); calc(); });
-    document.querySelectorAll('[data-amt]').forEach((c) => c.addEventListener('click', () => { amount.value = c.dataset.amt; calc(); }));
+    const touch = () => { interacted = true; };
+    amount.addEventListener('input', () => { touch(); calc(); });
+    from.addEventListener('change', () => { touch(); calc(); });
+    to.addEventListener('change', () => { touch(); calc(); });
+    $('cvSwap').addEventListener('click', () => { touch(); const a = from.value; from.value = to.value; to.value = a; $('cvSwap').classList.toggle('spin'); calc(); });
+    document.querySelectorAll('[data-amt]').forEach((c) => c.addEventListener('click', () => { touch(); amount.value = c.dataset.amt; calc(); }));
+    $('cvHistClear').addEventListener('click', () => { state.cvHistory = []; store.set('cvHistory', []); renderHist(); });
     document.querySelectorAll('[data-rate-status]').forEach(refreshRateStatus);
+    renderHist();
     calc();
   }
   return { html, mount };
