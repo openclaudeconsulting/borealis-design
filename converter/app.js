@@ -522,6 +522,42 @@ $('lensShop').addEventListener('change', (e) => setShop(e.target.value));
 $('lensHome').addEventListener('change', (e) => setHome(e.target.value));
 
 /* ============================================================
+   App menu (right-hand sheet)
+   ============================================================ */
+const menuSheet = $('menuSheet');
+function openMenu() {
+  // Populate fresh each open so selections always mirror current state.
+  $('menuHome').innerHTML = currencyOptions(state.home);
+  $('menuShop').innerHTML = currencyOptions(state.shop);
+  menuSheet.classList.add('on');
+  menuSheet.setAttribute('aria-hidden', 'false');
+  $('menuBtn').setAttribute('aria-expanded', 'true');
+  document.querySelectorAll('[data-rate-status]').forEach(refreshRateStatus);
+}
+function closeMenu() {
+  menuSheet.classList.remove('on');
+  menuSheet.setAttribute('aria-hidden', 'true');
+  $('menuBtn').setAttribute('aria-expanded', 'false');
+}
+$('menuBtn').addEventListener('click', () => {
+  menuSheet.classList.contains('on') ? closeMenu() : openMenu();
+});
+$('menuClose').addEventListener('click', closeMenu);
+$('menuBackdrop').addEventListener('click', closeMenu);
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && menuSheet.classList.contains('on')) closeMenu();
+});
+$('menuHome').addEventListener('change', (e) => { setHome(e.target.value); renderRoute(); });
+$('menuShop').addEventListener('change', (e) => { setShop(e.target.value); renderRoute(); });
+$('menuRefresh').addEventListener('click', async (e) => {
+  const btn = e.currentTarget;
+  btn.disabled = true; btn.textContent = 'Refreshing…';
+  await loadRates();
+  btn.disabled = false; btn.textContent = 'Refresh';
+  renderRoute();
+});
+
+/* ============================================================
    Router
    ============================================================ */
 const ROUTES = {
@@ -557,7 +593,13 @@ window.addEventListener('hashchange', renderRoute);
 // Global navigation via [data-nav]
 document.addEventListener('click', (e) => {
   const nav = e.target.closest('[data-nav]');
-  if (nav) { const shop2 = nav.getAttribute('data-shop2'); if (shop2) setShop(shop2); location.hash = nav.dataset.nav; }
+  if (nav) {
+    const shop2 = nav.getAttribute('data-shop2'); if (shop2) setShop(shop2);
+    if (menuSheet.classList.contains('on')) closeMenu();
+    const target = nav.dataset.nav;
+    // Re-render even when the hash is unchanged (e.g. menu → current view).
+    if (location.hash === target) renderRoute(); else location.hash = target;
+  }
 });
 $('backBtn').addEventListener('click', () => { location.hash = '#/'; });
 $('brand').addEventListener('click', () => { location.hash = '#/'; });
@@ -575,7 +617,18 @@ if ('serviceWorker' in navigator) {
 }
 // Install prompt
 let deferredPrompt = null;
-window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferredPrompt = e; showInstall(); });
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault(); deferredPrompt = e; showInstall();
+  $('menuInstallWrap').style.display = 'block';
+});
+$('menuInstall').addEventListener('click', async () => {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  await deferredPrompt.userChoice;
+  deferredPrompt = null;
+  $('menuInstallWrap').style.display = 'none';
+  closeMenu();
+});
 function showInstall() {
   if (!deferredPrompt || document.getElementById('installBtn')) return;
   const b = document.createElement('button');
@@ -585,7 +638,10 @@ function showInstall() {
   document.body.appendChild(b);
   setTimeout(() => { if (document.getElementById('installBtn')) b.remove(); }, 12000);
 }
-window.addEventListener('appinstalled', () => { const b = document.getElementById('installBtn'); if (b) b.remove(); });
+window.addEventListener('appinstalled', () => {
+  const b = document.getElementById('installBtn'); if (b) b.remove();
+  $('menuInstallWrap').style.display = 'none';
+});
 
 // Expose a few internals for automated tests.
 window.__roam = { state, convert, parseLensText: null };
