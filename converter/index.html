@@ -154,7 +154,7 @@
   #lensStage.on { display:block; }
   #lensVideo { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
   .lens-scrim { position:absolute; inset:0; background: radial-gradient(120% 80% at 50% 45%, transparent 40%, rgba(0,0,0,0.55) 100%); pointer-events:none; }
-  .reticle { position:absolute; left:8%; right:8%; top:40%; height:20%;
+  .reticle { position:absolute; left:8%; right:8%; top:32%; height:36%;
     border:2px solid rgba(255,255,255,0.9); border-radius:16px; box-shadow: 0 0 0 100vmax rgba(0,0,0,0.28); pointer-events:none; }
   .reticle::before, .reticle::after { content:''; position:absolute; left:50%; transform:translateX(-50%); width:80%; height:2px; background: linear-gradient(90deg, transparent, var(--aurora-4), transparent); animation: scanline 2.2s ease-in-out infinite; }
   @keyframes scanline { 0%{top:6%;opacity:.2} 50%{top:90%;opacity:1} 100%{top:6%;opacity:.2} }
