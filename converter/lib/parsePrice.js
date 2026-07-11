@@ -51,6 +51,14 @@ const ISO_CODES = new Set([
   'ILS','MYR','IDR','VND','ISK','SAR','QAR','RON','CLP','COP','ARS','UAH','TWD','VES',
 ]);
 
+// Currencies whose everyday prices are whole numbers — a bare integer there
+// is normal ("¥1500"), whereas in decimal-currency lands a bare "40" is far
+// more likely a percentage, quantity or SKU fragment than a price.
+const ZERO_DECIMAL = new Set(['JPY', 'KRW', 'VND', 'IDR', 'CLP', 'COP', 'HUF', 'ISK']);
+
+// A number immediately followed by one of these is a measurement, not a price.
+const UNIT_AFTER = /^\s*(kg|g|mg|ml|cl|l|oz|lb|lbs|cm|mm|m|km|kwh|pc|pcs|pk|ct|pack)\b/i;
+
 /**
  * Parse a numeric string with unknown grouping/decimal conventions.
  * Returns a Number, or NaN if it isn't a sane number.
@@ -109,12 +117,18 @@ function resolveCurrency(symbol, isoInText, hintCurrency) {
 /**
  * Extract the most likely price from an OCR string.
  * @param {string} text raw OCR output
- * @param {object} opts { shopCurrency } currency of the place you're standing in
+ * @param {object} opts
+ *   shopCurrency: currency of the place you're standing in
+ *   strict: require positive price evidence (currency symbol, ISO code or
+ *     decimal minor units; bare integers allowed only in zero-decimal
+ *     currencies). Use for noisy sources like live camera OCR, where a naked
+ *     number is more often a percentage/quantity/code than a price.
  * @returns {{ value:number, currency:string|null, symbol:string|null, raw:string } | null}
  */
 export function parsePrice(text, opts = {}) {
   if (!text) return null;
   const hint = opts.shopCurrency || null;
+  const strict = !!opts.strict;
   const cleaned = String(text).replace(/[  ]/g, ' ');
 
   // Find every number-like token together with its surrounding characters so we
@@ -126,12 +140,14 @@ export function parsePrice(text, opts = {}) {
     const rawNum = m[0];
     const start = m.index;
     const end = start + rawNum.length;
-    const before = cleaned.slice(Math.max(0, start - 6), start);
-    const after = cleaned.slice(end, end + 6);
+    const before = cleaned.slice(Math.max(0, start - 8), start);
+    const after = cleaned.slice(end, end + 8);
 
-    // A percentage or a plain unit quantity is not a price.
+    // A percentage is not a price ("40% RECYCLED POLYESTER", "SAVE 20 %").
     if (/^\s*%/.test(after)) continue;
-    if (/^\s*(kg|g|ml|l|oz|lb|cm|mm|km|kwh)\b/i.test(after) && !/[€£$¥₩₹฿]/.test(before)) continue;
+    // Neither is a plain unit quantity ("500g", "1.5 L") unless a currency
+    // symbol anchors it as money.
+    if (UNIT_AFTER.test(after) && !/[€£$¥₩₹฿₫₴₪₱]/.test(before)) continue;
 
     const value = parseNumber(rawNum);
     if (!Number.isFinite(value) || value <= 0) continue;
@@ -148,17 +164,23 @@ export function parsePrice(text, opts = {}) {
     }
     // A 3-letter ISO code near the number (e.g. "19.95 CHF").
     const isoMatch = (before + ' ' + after).toUpperCase().match(/\b([A-Z]{3})\b/);
-    const iso = isoMatch ? isoMatch[1] : null;
+    const iso = isoMatch && ISO_CODES.has(isoMatch[1]) ? isoMatch[1] : null;
 
     // Does the number look like a real price (has a decimal or a symbol)?
     const hasDecimal = /[.,]\d{1,2}\b/.test(rawNum) && value < 100000;
     candidates.push({ value, symbol, iso, hasDecimal, raw: rawNum.trim() });
   }
 
-  if (candidates.length === 0) return null;
+  // Strict mode: demand positive evidence of price-ness. A bare integer only
+  // qualifies where whole-number prices are the norm (zero-decimal currency).
+  const pool = strict
+    ? candidates.filter((c) => c.symbol || c.iso || c.hasDecimal || ZERO_DECIMAL.has(hint))
+    : candidates;
+
+  if (pool.length === 0) return null;
 
   // Rank: symbol/ISO match first, then decimal-looking, then a sane magnitude.
-  candidates.sort((a, b) => {
+  pool.sort((a, b) => {
     const score = (c) =>
       (c.symbol || (c.iso && ISO_CODES.has(c.iso)) ? 100 : 0) +
       (c.hasDecimal ? 20 : 0) +
@@ -166,7 +188,7 @@ export function parsePrice(text, opts = {}) {
     return score(b) - score(a);
   });
 
-  const best = candidates[0];
+  const best = pool[0];
   const currency = resolveCurrency(best.symbol, best.iso, hint);
   return { value: best.value, currency, symbol: best.symbol || null, raw: best.raw };
 }

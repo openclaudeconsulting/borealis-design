@@ -59,6 +59,7 @@ export function createLens(opts) {
   let stream = null, worker = null, running = false, busy = false, timer = null;
   let track = null, torchOn = false;
   let lastGoodAt = 0, staleNotified = false;
+  let pendingSig = null, pendingVotes = 0;
 
   function emitReady() { onStatus({ phase: 'ready', text: 'Point at a price' }); }
 
@@ -78,11 +79,15 @@ export function createLens(opts) {
         }
       },
     });
-    // Bias OCR toward price glyphs; read the crop as a block of lines so a
-    // menu with several prices yields one result per line, in order.
+    // Character set and layout mode are shared with tools/lens-eval.mjs —
+    // keep them in sync. Letters and % stay VISIBLE to OCR so the parser can
+    // recognise non-prices ("40% RECYCLED POLYESTER", "500g", "6 pk") instead
+    // of mistaking their digits for money. PSM 4 (single column, variable
+    // sizes) is essential: tags put a huge price under small text, and PSM 6
+    // silently drops the price line for violating its uniformity assumption.
     await w.setParameters({
-      tessedit_char_whitelist: '0123456789.,€£$¥₩₹฿ CHFkrRp',
-      tessedit_pageseg_mode: '6', // uniform block of text
+      tessedit_char_whitelist: "0123456789.,'€£$¥₩₹฿%ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyzÉÈéè /()-",
+      tessedit_pageseg_mode: '4',
     });
     worker = w;
     emitReady();
@@ -216,7 +221,9 @@ export function createLens(opts) {
       for (const ln of lines) {
         if (!ln.text) continue;
         if (ln.confidence != null && ln.confidence < 30) continue;
-        const parsed = parsePrice(ln.text, { shopCurrency: shop });
+        // strict: a number must prove it's a price (symbol/ISO/decimals) —
+        // bare digits from percentages, quantities and codes don't qualify.
+        const parsed = parsePrice(ln.text, { shopCurrency: shop, strict: true });
         if (!parsed || !(parsed.value > 0)) continue;
         const from = parsed.currency || shop;
         const converted = convert(parsed.value, from, home, rates);
@@ -230,15 +237,24 @@ export function createLens(opts) {
         if (items.length >= 6) break; // keep the overlay readable
       }
       if (items.length) {
-        lastGoodAt = Date.now();
-        staleNotified = false;
-        onResult({
-          items,
-          multi: items.length > 1,
-          ...items[0], // single-price consumers keep working unchanged
-          confidence: Math.round(data.confidence),
-        });
+        // Two-frame voting: only surface a reading the OCR produced twice in
+        // a row. Single-frame hallucinations (glare, motion blur, overlapping
+        // tags) die here instead of flashing wrong numbers at the user.
+        const sig = items.map((i) => i.from + ':' + i.value).join('|');
+        if (sig === pendingSig) pendingVotes++; else { pendingSig = sig; pendingVotes = 1; }
+        if (pendingVotes >= 2) {
+          lastGoodAt = Date.now();
+          staleNotified = false;
+          onResult({
+            items,
+            multi: items.length > 1,
+            ...items[0], // single-price consumers keep working unchanged
+            confidence: Math.round(data.confidence),
+          });
+        }
       }
+      // An empty frame leaves the pending vote intact — hand shake between
+      // two good frames shouldn't restart the count.
     } catch (err) {
       if (err && err.message === 'ocr-timeout') await recoverWorker();
       /* other transient OCR errors — keep scanning */
@@ -277,6 +293,7 @@ export function createLens(opts) {
     busy = false;
     await terminate();
     lastGoodAt = 0; staleNotified = false;
+    pendingSig = null; pendingVotes = 0;
     return start();
   }
 
