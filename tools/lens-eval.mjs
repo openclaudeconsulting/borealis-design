@@ -26,7 +26,7 @@
 import { createRequire } from 'module';
 import { fileURLToPath } from 'url';
 import path from 'path';
-import { parsePrice } from '../converter/lib/parsePrice.js';
+import { selectPrices } from '../converter/lib/parsePrice.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const require_ = createRequire(import.meta.url);
@@ -36,11 +36,11 @@ const Tesseract = process.env.TESSERACT_DIR ? require_(process.env.TESSERACT_DIR
 const playwright = process.env.PLAYWRIGHT_DIR ? require_(process.env.PLAYWRIGHT_DIR) : req('', 'playwright');
 
 // ——— Keep these two in sync with converter/lens.js ———
-// PSM 4 = single column, variable text sizes. Critical: price tags put a huge
-// price under small description lines, and PSM 6 ("uniform block") silently
-// DROPS the price line for violating its uniformity assumption.
+// PSM 11 = sparse text. Critical: block/column modes (6 and even 4) silently
+// DROP a huge price line when it doesn't fit the layout they assume; sparse
+// finds every chunk with its bbox and we restore reading order ourselves.
 const OCR_WHITELIST = '0123456789.,\'€£$¥₩₹฿%ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyzÉÈéè /()-';
-const OCR_PSM = '4';
+const OCR_PSM = '11';
 
 /* ============================================================
    Corpus. html is the visual scene; shop is the traveller's
@@ -163,6 +163,35 @@ const CORPUS = [
       <div style="font-size:58px;font-weight:800;margin-top:10px">NOW $29.99</div>
     </div>`,
   },
+  {
+    name: 'quebec shelf label (the real-world failure: codes, dates, unit price)',
+    shop: 'CAD', expect: [8.49],
+    html: `<div style="padding:18px;font-family:Arial;text-align:left;width:640px">
+      <div style="font-size:19px">2026/03/11 &nbsp;&nbsp; 3 C20470 &nbsp; E</div>
+      <div style="font-size:19px">006-28110-14602</div>
+      <div style="font-size:19px">34818103</div>
+      <div style="font-size:72px;font-weight:800;text-align:center;margin:6px 0">8,49</div>
+      <div style="font-size:24px;text-align:center">1,31 $ / 100 ml</div>
+      <div style="font-size:20px">SteFa pate rosee 648ml</div>
+    </div>`,
+  },
+  {
+    name: 'barcode digits only — nothing to convert',
+    shop: 'CAD', expect: [],
+    html: `<div style="padding:26px;font-family:Arial;text-align:center">
+      <div style="font-size:30px;font-weight:600">006-28110-14602</div>
+      <div style="font-size:30px;font-weight:600;margin-top:8px">34818103</div>
+    </div>`,
+  },
+  {
+    name: 'electronics tag: big price beats small SKU line',
+    shop: 'USD', expect: [499.99],
+    html: `<div style="padding:22px;font-family:Arial;text-align:center">
+      <div style="font-size:26px;font-weight:600">WIRELESS HEADPHONES</div>
+      <div style="font-size:64px;font-weight:800;margin:8px 0">$499.99</div>
+      <div style="font-size:18px">SKU 04581230 REG 549.99</div>
+    </div>`,
+  },
 ];
 
 /* ============================================================ */
@@ -184,15 +213,13 @@ async function main() {
     await page.setContent(`<body style="margin:0;background:#fff;color:#000;display:flex;align-items:center;justify-content:center;min-height:460px">${c.html}</body>`);
     const png = await page.screenshot();
     const { data } = await worker.recognize(png);
-    const lines = (data.lines && data.lines.length) ? data.lines
-      : String(data.text || '').split('\n').map((t) => ({ text: t, confidence: data.confidence }));
-    const got = [];
-    for (const ln of lines) {
-      if (!ln.text) continue;
-      if (ln.confidence != null && ln.confidence < 30) continue;
-      const p = parsePrice(ln.text, { shopCurrency: c.shop, strict: true });
-      if (p && p.value > 0) got.push(p.value);
-    }
+    // Same shape lens.js feeds selectPrices: text + confidence + bbox height.
+    const lines = (data.lines && data.lines.length)
+      ? data.lines
+          .map((l) => ({ text: l.text, confidence: l.confidence, height: l.bbox ? (l.bbox.y1 - l.bbox.y0) : 0, top: l.bbox ? l.bbox.y0 : 0 }))
+          .sort((a, b) => a.top - b.top)
+      : String(data.text || '').split('\n').map((t) => ({ text: t, confidence: data.confidence, height: 0 }));
+    const got = selectPrices(lines, { shopCurrency: c.shop }).map((i) => i.value);
     const ok = got.length === c.expect.length && got.every((v, i) => Math.abs(v - c.expect[i]) < 1e-9);
     if (ok) { pass++; console.log(`PASS  ${c.name}  →  [${got.join(', ')}]`); }
     else {
