@@ -7,8 +7,17 @@
 <meta name="description" content="A fast, friendly currency converter by Borealis Design. Phase one of a live camera overlay that prices the world around you in your home currency." />
 <meta name="theme-color" content="#07060d" />
 
+<!-- PWA -->
+<link rel="manifest" href="manifest.webmanifest" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Converter" />
+<meta name="application-name" content="Borealis Converter" />
+
 <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-<link rel="apple-touch-icon" href="/favicon.svg" />
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png" />
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
 
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -208,10 +217,16 @@
       </span>
       <span class="font-semibold tracking-tight text-[17px]">Borealis<span class="text-[var(--muted)] font-light">&nbsp;Converter</span></span>
     </a>
-    <a href="/" class="btn-ghost text-sm">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M19 12H5M11 18l-6-6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      Back to studio
-    </a>
+    <div class="flex items-center gap-2">
+      <button id="installBtn" class="btn-primary text-sm" style="display:none; padding: 10px 18px;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Install app
+      </button>
+      <a href="/" class="btn-ghost text-sm">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M19 12H5M11 18l-6-6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="hidden sm:inline">Back to studio</span>
+      </a>
+    </div>
   </div>
 </nav>
 
@@ -474,6 +489,40 @@ document.querySelectorAll('.quick-chip').forEach((chip) => {
 });
 
 fetchRates();
+
+/* ============================================================
+   PWA: service worker + install prompt
+   ============================================================ */
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch((err) => {
+      console.warn('Service worker registration failed:', err.message);
+    });
+  });
+}
+
+// Custom install button (Android/desktop Chromium). iOS uses Share → Add to Home Screen.
+let deferredPrompt = null;
+const installBtn = $('installBtn');
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  installBtn.style.display = 'inline-flex';
+});
+
+installBtn.addEventListener('click', async () => {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  await deferredPrompt.userChoice;
+  deferredPrompt = null;
+  installBtn.style.display = 'none';
+});
+
+window.addEventListener('appinstalled', () => {
+  deferredPrompt = null;
+  installBtn.style.display = 'none';
+});
 </script>
 
 </body>
