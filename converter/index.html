@@ -29,8 +29,8 @@
   :root {
     --bg: #07060d;
     --bg-2: #0c0a18;
-    --fg: #f5f3ff;
-    --muted: #9b97b3;
+    --fg: #ffffff;
+    --muted: #ffffff;
     --border: rgba(255, 255, 255, 0.08);
     --border-strong: rgba(255, 255, 255, 0.16);
     --aurora-1: #ff4d8d;   /* magenta */
@@ -103,7 +103,7 @@
   /* ========== Buttons ========== */
   .btn-primary {
     position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 10px;
-    padding: 16px 28px; border-radius: 999px; font-weight: 500; color: #0b0a14; border: 0; cursor: pointer;
+    padding: 16px 28px; border-radius: 999px; font-weight: 600; color: #000000; border: 0; cursor: pointer;
     background: linear-gradient(120deg, var(--aurora-4), var(--aurora-2), var(--aurora-1));
     background-size: 200% 200%;
     transition: transform 0.3s cubic-bezier(0.2, 0.9, 0.3, 1), background-position 0.6s ease, box-shadow 0.4s ease;
@@ -131,14 +131,11 @@
     width: 100%; background: transparent; border: 0; outline: 0; color: #ffffff;
     font-family: 'Inter', sans-serif; font-weight: 700; font-size: clamp(2rem, 8vw, 3.25rem);
     line-height: 1; letter-spacing: -0.02em; padding: 0; -moz-appearance: textfield;
-    /* Light text → dark outline + drop shadow for legibility over the aurora. */
-    -webkit-text-stroke: 0.8px rgba(3, 2, 8, 0.5);
-    paint-order: stroke fill;
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55), 0 3px 10px rgba(0, 0, 0, 0.45);
   }
   .amount-input::-webkit-outer-spin-button,
   .amount-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-  .amount-input::placeholder { color: rgba(155,151,179,0.4); }
+  .amount-input::placeholder { color: rgba(255,255,255,0.4); }
 
   .cur-select {
     appearance: none; -webkit-appearance: none;
@@ -167,14 +164,8 @@
 
   .result-value {
     font-weight: 800; font-size: clamp(2.4rem, 9vw, 4rem); line-height: 1;
-    letter-spacing: -0.03em;
-    background: linear-gradient(120deg, var(--aurora-4), var(--aurora-2), var(--aurora-1));
-    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
-    /* Dark outline drawn beneath the gradient fill (paint-order), plus a drop
-       shadow via filter — keeps the value crisp against the moving backdrop. */
-    -webkit-text-stroke: 2.4px rgba(3, 2, 8, 0.72);
-    paint-order: stroke fill;
-    filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.6)) drop-shadow(0 4px 12px rgba(0, 0, 0, 0.4));
+    letter-spacing: -0.03em; color: #ffffff;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
   }
 
   .rate-pill {
@@ -320,7 +311,7 @@
         <div>
           <div class="flex items-center gap-2 mb-1.5">
             <h2 class="text-xl font-semibold">Next: point &amp; price</h2>
-            <span class="text-[11px] font-semibold tracking-wide uppercase px-2 py-0.5 rounded-full" style="color: var(--aurora-4); border: 1px solid rgba(34,211,238,0.35); background: rgba(34,211,238,0.08);">Phase 02</span>
+            <span class="text-[11px] font-semibold tracking-wide uppercase px-2 py-0.5 rounded-full" style="color: #ffffff; border: 1px solid rgba(34,211,238,0.45); background: rgba(34,211,238,0.14);">Phase 02</span>
           </div>
           <p class="text-[var(--muted)] leading-relaxed">
             Walk a foreign grocery aisle and hold up your phone. Borealis reads every price tag through the camera and overlays it — live — in your home currency. No photos, no typing, no math. Just travel that finally speaks your language.
