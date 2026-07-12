@@ -24,6 +24,7 @@
    ============================================================ */
 
 import { createRequire } from 'module';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import path from 'path';
 import { selectPrices } from '../converter/lib/parsePrice.js';
@@ -184,6 +185,19 @@ const CORPUS = [
     </div>`,
   },
   {
+    name: 'dot-matrix boutique tag (Tremblant-style, the real-world failure)',
+    shop: 'CAD', expect: [65],
+    html: `<div style="padding:20px;font-family:'Courier New',monospace;text-align:left">
+      <div style="font-size:26px;font-weight:700">Boutiques Tremblant</div>
+      <div style="position:relative;display:inline-block;font-size:82px;font-weight:700;margin:4px 0">$65.00
+        <div style="position:absolute;inset:0;background:repeating-linear-gradient(0deg,rgba(255,255,255,0) 0 3px,#fff 3px 6px),repeating-linear-gradient(90deg,rgba(255,255,255,0) 0 3px,#fff 3px 6px)"></div>
+      </div>
+      <div style="font-size:26px;font-weight:700">NOIR</div>
+      <div style="font-size:26px;font-weight:700">10</div>
+      <div style="font-size:34px;font-weight:800;margin-top:6px">SPECIAL 20% OFF</div>
+    </div>`,
+  },
+  {
     name: 'electronics tag: big price beats small SKU line',
     shop: 'USD', expect: [499.99],
     html: `<div style="padding:22px;font-family:Arial;text-align:center">
@@ -208,18 +222,45 @@ async function main() {
   });
   await worker.setParameters({ tessedit_char_whitelist: OCR_WHITELIST, tessedit_pageseg_mode: OCR_PSM });
 
-  let pass = 0, fail = 0;
-  for (const c of CORPUS) {
-    await page.setContent(`<body style="margin:0;background:#fff;color:#000;display:flex;align-items:center;justify-content:center;min-height:460px">${c.html}</body>`);
-    const png = await page.screenshot();
-    const { data } = await worker.recognize(png);
-    // Same shape lens.js feeds selectPrices: text + confidence + bbox height.
+  // Preprocessing page: runs the app's ocrPrep passes (identical code) on the
+  // rendered screenshot before OCR — pass A (greyContrast) always, pass B
+  // (dotMatrixFuse) when pass A finds no prices, mirroring converter/lens.js.
+  const prepSrc = fs.readFileSync(path.join(here, '..', 'converter', 'lib', 'ocrPrep.js'), 'utf8').replace(/export /g, '');
+  const prep = await browser.newPage({ viewport: { width: 760, height: 460 } });
+  await prep.addScriptTag({ content: prepSrc });
+  const preprocess = async (pngBuf, mode) => {
+    const dataUrl = 'data:image/png;base64,' + pngBuf.toString('base64');
+    const out = await prep.evaluate(async ({ dataUrl, mode }) => {
+      const img = new Image();
+      await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = dataUrl; });
+      const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
+      const x = c.getContext('2d'); x.drawImage(img, 0, 0);
+      const d = x.getImageData(0, 0, c.width, c.height);
+      if (mode === 'fuse') dotMatrixFuse(d.data, c.width, c.height); else greyContrast(d.data, c.width, c.height);
+      x.putImageData(d, 0, 0);
+      return c.toDataURL('image/png');
+    }, { dataUrl, mode });
+    return Buffer.from(out.split(',')[1], 'base64');
+  };
+  const ocrSelect = async (buf, shop) => {
+    const { data } = await worker.recognize(buf);
     const lines = (data.lines && data.lines.length)
       ? data.lines
           .map((l) => ({ text: l.text, confidence: l.confidence, height: l.bbox ? (l.bbox.y1 - l.bbox.y0) : 0, top: l.bbox ? l.bbox.y0 : 0 }))
           .sort((a, b) => a.top - b.top)
       : String(data.text || '').split('\n').map((t) => ({ text: t, confidence: data.confidence, height: 0 }));
-    const got = selectPrices(lines, { shopCurrency: c.shop }).map((i) => i.value);
+    return { got: selectPrices(lines, { shopCurrency: shop }).map((i) => i.value), text: data.text };
+  };
+
+  let pass = 0, fail = 0;
+  for (const c of CORPUS) {
+    await page.setContent(`<body style="margin:0;background:#fff;color:#000;display:flex;align-items:center;justify-content:center;min-height:460px">${c.html}</body>`);
+    const png = await page.screenshot();
+    // Pass A (standard contrast); pass B (dot-fuse) only if A found nothing —
+    // exactly the live Lens pipeline.
+    let { got, text } = await ocrSelect(await preprocess(png, 'grey'), c.shop);
+    if (!got.length) ({ got, text } = await ocrSelect(await preprocess(png, 'fuse'), c.shop));
+    const data = { text };
     const ok = got.length === c.expect.length && got.every((v, i) => Math.abs(v - c.expect[i]) < 1e-9);
     if (ok) { pass++; console.log(`PASS  ${c.name}  →  [${got.join(', ')}]`); }
     else {
