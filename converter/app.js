@@ -11,6 +11,7 @@ import { TIPPING, calcTip } from './lib/tips.js';
 import { COUNTRIES, WATER_LABEL, PLUG_INFO } from './lib/countries.js';
 import { LANGUAGES, CATEGORIES as PHRASE_CATS, PHRASES } from './lib/phrases.js';
 import { createLens, isSecureCameraContext } from './lens.js';
+import { APP_VERSION, LENS_VERSION } from './lib/version.js';
 
 /* ---------- state + persistence ---------- */
 const store = {
@@ -157,7 +158,7 @@ function viewHome() {
       </div>
       ${destCardHTML()}
       <div class="tile-grid">${tiles}</div>
-      <p class="muted" style="text-align:center; font-size:12px; margin-top:22px">Works offline · installable · a Borealis Design experiment</p>
+      <p class="muted" style="text-align:center; font-size:12px; margin-top:22px">Roam ${APP_VERSION} · Works offline · installable · a Borealis Design experiment</p>
     </div>` , mount() {
       document.querySelectorAll('[data-rate-status]').forEach(refreshRateStatus);
       const hd = document.getElementById('homeDest');
@@ -607,9 +608,19 @@ function viewWallet() {
    ============================================================ */
 const lensStage = $('lensStage');
 let lens = null, lensPrevHash = '#/';
+// With a trip destination set, the scanner converts ONLY that country's
+// currency into yours (e.g. Canada → CAD to USD): the From picker is pinned.
+function lensLockedCurrency() {
+  return state.dest && COUNTRIES[state.dest] ? COUNTRIES[state.dest].currency : null;
+}
 function fillLensSelects() {
-  $('lensShop').innerHTML = Object.keys(CURRENCIES).map((c) => `<option value="${c}" ${c === state.shop ? 'selected' : ''}>${c}</option>`).join('');
+  const locked = lensLockedCurrency();
+  $('lensShop').innerHTML = locked
+    ? `<option value="${locked}" selected>${locked}</option>`
+    : Object.keys(CURRENCIES).map((c) => `<option value="${c}" ${c === state.shop ? 'selected' : ''}>${c}</option>`).join('');
+  $('lensShop').disabled = !!locked;
   $('lensHome').innerHTML = Object.keys(CURRENCIES).map((c) => `<option value="${c}" ${c === state.home ? 'selected' : ''}>${c}</option>`).join('');
+  $('lensVer').textContent = 'Lens ' + LENS_VERSION;
 }
 function lensMsg(html) { const m = $('lensMsg'); m.style.display = html ? 'flex' : 'none'; m.innerHTML = html || ''; }
 
@@ -663,6 +674,7 @@ function openLens() {
     getShopCurrency: () => $('lensShop').value,
     getHomeCurrency: () => $('lensHome').value,
     getRates: () => state.rates,
+    getCurrencyLock: () => !!lensLockedCurrency(),
     onStatus: (s) => { $('lensStatus').textContent = s.text || ''; },
     onError: (e) => {
       lensMsg(`<div class="glass" style="padding:22px;max-width:340px"><div style="font-size:40px">🚫</div>
