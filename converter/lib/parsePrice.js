@@ -226,18 +226,16 @@ export function parsePrice(text, opts = {}) {
 const UNIT_PRICE_LINE = /\/\s*\d*\s*(ml|cl|l|g|kg|lb|lbs|oz|ea|un|unit|pc|pcs|each)\b/i;
 
 /**
+ * Parse EVERY priced line into an item — no size filtering, no ranking.
+ * The Lens caches this full set per frame so a tap can be answered from
+ * memory instantly, even for prices the big-print rule would hide.
  * @param {Array<{text:string, confidence?:number, height?:number, bbox?:object}>} lines
  *   OCR lines in top-to-bottom order (height = bbox pixel height; bbox is
  *   passed through untouched for overlay positioning).
- * @param {object} opts
- *   shopCurrency, maxItems=6, minConfidence=30
- *   target: {x, y} in the same coordinate space as the line bboxes — when
- *     set (user tapped a spot), the price whose line is NEAREST the target
- *     is returned alone, overriding size ranking. Camera-style tap-to-focus.
- * @returns {Array<{value:number, currency:string|null, raw:string, height:number, unitPrice:boolean, bbox:object|null}>}
+ * @param {object} opts shopCurrency, minConfidence=30
+ * @returns {Array<{value:number, currency:string|null, raw:string, height:number, unitPrice:boolean, bbox:object|null, order:number}>}
  */
-export function selectPrices(lines, opts = {}) {
-  const maxItems = opts.maxItems || 6;
+export function collectPrices(lines, opts = {}) {
   const minConf = opts.minConfidence == null ? 30 : opts.minConfidence;
   const items = [];
   let idx = 0;
@@ -256,7 +254,20 @@ export function selectPrices(lines, opts = {}) {
       order: idx++,
     });
   }
-  if (!items.length) return [];
+  return items;
+}
+
+/**
+ * Rank pre-collected items (from collectPrices) into what's worth showing.
+ * @param {object} opts
+ *   maxItems=6
+ *   target: {x, y} in the same coordinate space as the item bboxes — when
+ *     set (user tapped a spot), the price whose line is NEAREST the target
+ *     is returned alone, overriding size ranking. Camera-style tap-to-focus.
+ */
+export function selectFromItems(items, opts = {}) {
+  const maxItems = opts.maxItems || 6;
+  if (!items || !items.length) return [];
 
   // Tap-to-target: the user pointed at a specific number — honour it above
   // every other rule and return just that price.
@@ -286,6 +297,15 @@ export function selectPrices(lines, opts = {}) {
     });
   }
   return kept.slice(0, maxItems);
+}
+
+/**
+ * OCR lines -> the prices worth showing. Convenience wrapper combining
+ * collectPrices + selectFromItems; the Lens calls the two halves separately
+ * so it can cache the full item set for instant tap answers.
+ */
+export function selectPrices(lines, opts = {}) {
+  return selectFromItems(collectPrices(lines, opts), opts);
 }
 
 export default parsePrice;

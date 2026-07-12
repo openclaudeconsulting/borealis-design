@@ -15,7 +15,7 @@
      full restart.
    ============================================================ */
 
-import { selectPrices } from './lib/parsePrice.js';
+import { collectPrices, selectFromItems } from './lib/parsePrice.js';
 import { convert, formatMoney } from './lib/convert.js';
 import { greyContrast, dotMatrixFuse, rotatePointFromBase, rotateBoxToBase } from './lib/ocrPrep.js';
 
@@ -64,6 +64,15 @@ export function createLens(opts) {
   let lastCrop = null;                    // {bandX, bandY, scale} of the last grab
   let target = null;                      // {x, y, at} in VIDEO coords (tap-to-focus)
   const TARGET_TTL_MS = 6000;
+  // Tap-speed machinery: every full-band pass caches EVERY parsed price
+  // (not just the ones the big-print rule shows) with its VIDEO-coord box.
+  // A tap that lands on a cached item is answered from memory in ~a frame —
+  // no OCR wait — then confirmed by an immediate targeted pass.
+  let itemCache = [];                     // [{value, currency, raw, vbox}]
+  let itemCacheAt = 0, itemCacheConf = 0;
+  const ITEM_CACHE_TTL_MS = 3000;
+  const TAP_HIT_RADIUS = 60;              // video px: how far a tap may miss a box
+  let tapQueued = false;                  // tap arrived while an OCR pass was busy
   // Fallback ladder for frames the standard pass can't read: dot-matrix
   // print and/or sideways tags. One ladder step per empty frame keeps every
   // tick at ≤2 OCR passes; a hit becomes the sticky preferred fallback so
@@ -249,6 +258,18 @@ export function createLens(opts) {
       }
       const crop = lastCrop;
 
+      // Map a bbox from a (possibly rotated) pass image back to VIDEO coords.
+      const toVideoBox = (bbox, rot) => {
+        if (!bbox || !crop) return null;
+        const b = rotateBoxToBase(bbox, rot, rawFrame.width, rawFrame.height);
+        return {
+          x0: crop.bandX + b.x0 / crop.scale,
+          y0: crop.bandY + b.y0 / crop.scale,
+          x1: crop.bandX + b.x1 / crop.scale,
+          y1: crop.bandY + b.y1 / crop.scale,
+        };
+      };
+
       // OCR one canvas → converted price items. Shared by all passes.
       // `rot` maps result boxes (and the tap target) between the rotated
       // pass image and the base crop.
@@ -258,9 +279,20 @@ export function createLens(opts) {
         const passTarget = cropTarget
           ? rotatePointFromBase(cropTarget.x, cropTarget.y, rot, rawFrame.width, rawFrame.height)
           : null;
+        // Tap fast-path: OCR only a patch around the tapped point instead of
+        // the whole band — Tesseract time scales with area, so this cuts a
+        // targeted pass to a fraction of a full one. SetRectangle keeps
+        // result coordinates in full-image space, so no bbox remapping.
+        let recOpts;
+        if (passTarget) {
+          const rw = Math.round(cv.width * 0.55), rh = Math.round(cv.height * 0.6);
+          const left = Math.round(Math.min(Math.max(passTarget.x - rw / 2, 0), cv.width - rw));
+          const top = Math.round(Math.min(Math.max(passTarget.y - rh / 2, 0), cv.height - rh));
+          recOpts = { rectangle: { left, top, width: rw, height: rh } };
+        }
         // Watchdog: a wedged recognize() must not freeze the loop forever.
         const rec = await Promise.race([
-          worker.recognize(cv),
+          worker.recognize(cv, recOpts || undefined),
           new Promise((_, rej) => setTimeout(() => rej(new Error('ocr-timeout')), OCR_TIMEOUT_MS)),
         ]);
         const { data } = rec;
@@ -278,22 +310,26 @@ export function createLens(opts) {
               }))
               .sort((a, b) => a.top - b.top) // sparse mode: restore reading order
           : String(data.text || '').split('\n').map((t) => ({ text: t, confidence: data.confidence, height: 0 }));
-        const items = selectPrices(lines, { shopCurrency: shop, target: passTarget }).map((sel) => {
+        const all = collectPrices(lines, { shopCurrency: shop });
+        // Full-band passes refresh the tap cache with EVERY parsed price in
+        // video coordinates — including small print the big-print rule hides —
+        // so a tap on any of them is answered from memory instantly.
+        // (Targeted patch passes see too little of the frame to cache.)
+        if (!passTarget && all.length) {
+          itemCache = all.map((it) => ({
+            value: it.value, currency: it.currency, raw: it.raw,
+            vbox: toVideoBox(it.bbox, rot),
+          }));
+          itemCacheAt = Date.now();
+          itemCacheConf = data.confidence;
+        }
+        const items = selectFromItems(all, { target: passTarget }).map((sel) => {
           const from = sel.currency || shop;
           const converted = convert(sel.value, from, home, rates);
           if (!Number.isFinite(converted)) return null;
           // Map the matched line's bbox (possibly in rotated coords) back to
-          // the base crop, then to VIDEO coordinates for the lock-on box.
-          let box = null;
-          if (sel.bbox && crop) {
-            const b = rotateBoxToBase(sel.bbox, rot, rawFrame.width, rawFrame.height);
-            box = {
-              x0: crop.bandX + b.x0 / crop.scale,
-              y0: crop.bandY + b.y0 / crop.scale,
-              x1: crop.bandX + b.x1 / crop.scale,
-              y1: crop.bandY + b.y1 / crop.scale,
-            };
-          }
+          // VIDEO coordinates for the lock-on box.
+          const box = toVideoBox(sel.bbox, rot);
           return {
             value: sel.value, from, home, converted,
             fromText: formatMoney(sel.value, from),
@@ -327,7 +363,9 @@ export function createLens(opts) {
         // tags) die here instead of flashing wrong numbers at the user.
         const sig = items.map((i) => i.from + ':' + i.value).join('|');
         if (sig === pendingSig) pendingVotes++; else { pendingSig = sig; pendingVotes = 1; }
-        if (pendingVotes >= 2) {
+        // An explicit tap is its own confirmation — a targeted pass surfaces
+        // on the first read. Ambient scanning still needs two matching frames.
+        if (pendingVotes >= (cropTarget ? 1 : 2)) {
           lastGoodAt = Date.now();
           staleNotified = false;
           onResult({
@@ -351,7 +389,9 @@ export function createLens(opts) {
         staleNotified = true;
         onStale();
       }
-      scheduleTick();
+      // A tap that arrived mid-pass runs immediately, not a tick later.
+      if (tapQueued) { tapQueued = false; scheduleTick(0); }
+      else scheduleTick();
     }
   }
 
@@ -379,6 +419,47 @@ export function createLens(opts) {
     target = { x: vx, y: vy, at: Date.now() };
     // A new intent invalidates the current vote so the switch feels instant.
     pendingSig = null; pendingVotes = 0;
+    // Answer from the frame cache when the tap lands on a price we've
+    // already parsed — the conversion appears with zero OCR wait.
+    instantAnswer(vx, vy);
+    // Either way, run a targeted OCR pass NOW instead of waiting out the
+    // tick interval; if a pass is mid-flight, queue the tap right behind it.
+    if (running) {
+      if (busy) tapQueued = true; else scheduleTick(0);
+    }
+  }
+
+  // Serve a tap straight from the last full-band parse. Returns true when a
+  // cached price box is on/near the tapped point and was surfaced.
+  function instantAnswer(vx, vy) {
+    if (!itemCache.length || Date.now() - itemCacheAt > ITEM_CACHE_TTL_MS) return false;
+    let best = null, bestD = Infinity;
+    for (const it of itemCache) {
+      if (!it.vbox) continue;
+      // Distance from the tap to the box edge (0 inside the box).
+      const dx = Math.max(it.vbox.x0 - vx, 0, vx - it.vbox.x1);
+      const dy = Math.max(it.vbox.y0 - vy, 0, vy - it.vbox.y1);
+      const d = Math.hypot(dx, dy);
+      if (d < bestD) { bestD = d; best = it; }
+    }
+    if (!best || bestD > TAP_HIT_RADIUS) return false;
+    const shop = getShopCurrency(), home = getHomeCurrency();
+    const from = best.currency || shop;
+    const converted = convert(best.value, from, home, getRates());
+    if (!Number.isFinite(converted)) return false;
+    const item = {
+      value: best.value, from, home, converted,
+      fromText: formatMoney(best.value, from),
+      homeText: formatMoney(converted, home),
+      raw: best.raw, box: best.vbox,
+    };
+    lastGoodAt = Date.now();
+    staleNotified = false;
+    // Seed the vote so the follow-up targeted pass merely re-confirms.
+    pendingSig = from + ':' + best.value;
+    pendingVotes = 1;
+    onResult({ items: [item], multi: false, ...item, confidence: Math.round(itemCacheConf || 0) });
+    return true;
   }
 
   // User-facing full restart: fresh camera, fresh OCR worker, clean state.
@@ -389,6 +470,7 @@ export function createLens(opts) {
     pendingSig = null; pendingVotes = 0;
     target = null; lastCrop = null;
     fallbackIdx = 0; preferredFallback = null;
+    itemCache = []; itemCacheAt = 0; tapQueued = false;
     return start();
   }
 
