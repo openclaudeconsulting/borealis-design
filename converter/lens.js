@@ -17,6 +17,7 @@
 
 import { selectPrices } from './lib/parsePrice.js';
 import { convert, formatMoney } from './lib/convert.js';
+import { greyContrast, dotMatrixFuse } from './lib/ocrPrep.js';
 
 const VENDOR = new URL('vendor/tesseract/', document.baseURI).href;
 const OCR_TIMEOUT_MS = 8000;   // a hung recognize() is recycled after this
@@ -174,9 +175,11 @@ export function createLens(opts) {
     timer = setTimeout(tick, delay);
   }
 
-  // Grab the reticle band, upscale + greyscale + contrast-stretch for OCR.
-  // Keep these fractions in sync with the .reticle CSS so the on-screen box
-  // matches exactly what is scanned.
+  // Grab the reticle band and keep the RAW pixels so tick() can run a second
+  // preprocessing pass (dot-matrix fusing) on the same frame if the first
+  // pass finds nothing. Keep the band fractions in sync with the .reticle
+  // CSS so the on-screen box matches exactly what is scanned.
+  let rawFrame = null; // ImageData of the unprocessed crop
   function grabReticle() {
     const vw = video.videoWidth, vh = video.videoHeight;
     if (!vw || !vh) return null;
@@ -187,17 +190,22 @@ export function createLens(opts) {
     ocrCanvas.height = Math.round(bandH * scale);
     const ctx = ocrCanvas.getContext('2d', { willReadFrequently: true });
     ctx.drawImage(video, bandX, bandY, bandW, bandH, 0, 0, ocrCanvas.width, ocrCanvas.height);
-    const img = ctx.getImageData(0, 0, ocrCanvas.width, ocrCanvas.height);
-    const d = img.data;
-    // Greyscale + simple contrast curve.
-    for (let i = 0; i < d.length; i += 4) {
-      let g = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
-      g = (g - 128) * 1.35 + 128;              // contrast
-      g = g < 0 ? 0 : g > 255 ? 255 : g;
-      d[i] = d[i + 1] = d[i + 2] = g;
-    }
+    rawFrame = ctx.getImageData(0, 0, ocrCanvas.width, ocrCanvas.height);
+    // Pass A: greyscale + contrast — best for solid print.
+    const img = new ImageData(new Uint8ClampedArray(rawFrame.data), rawFrame.width, rawFrame.height);
+    greyContrast(img.data, img.width, img.height);
     ctx.putImageData(img, 0, 0);
     lastCrop = { bandX, bandY, scale };
+    return ocrCanvas;
+  }
+
+  // Pass B: re-render the SAME frame with dot-fusing for dot-matrix tags.
+  function applyDotMatrixPass() {
+    if (!rawFrame) return null;
+    const ctx = ocrCanvas.getContext('2d', { willReadFrequently: true });
+    const img = new ImageData(new Uint8ClampedArray(rawFrame.data), rawFrame.width, rawFrame.height);
+    dotMatrixFuse(img.data, img.width, img.height);
+    ctx.putImageData(img, 0, 0);
     return ocrCanvas;
   }
 
@@ -208,29 +216,9 @@ export function createLens(opts) {
     if (!canvas) { scheduleTick(); return; }
     busy = true;
     try {
-      // Watchdog: a wedged recognize() must not freeze the loop forever.
-      const rec = await Promise.race([
-        worker.recognize(canvas),
-        new Promise((_, rej) => setTimeout(() => rej(new Error('ocr-timeout')), OCR_TIMEOUT_MS)),
-      ]);
-      const { data } = rec;
       const shop = getShopCurrency();
       const home = getHomeCurrency();
       const rates = getRates();
-      // Feed OCR lines (with their pixel heights) to the shared selection
-      // logic: strict per-line parsing, big-print priority, and per-unit
-      // price demotion — identical to what tools/lens-eval.mjs scores.
-      const lines = (data.lines && data.lines.length)
-        ? data.lines
-            .map((l) => ({
-              text: l.text,
-              confidence: l.confidence,
-              height: l.bbox ? (l.bbox.y1 - l.bbox.y0) : 0,
-              top: l.bbox ? l.bbox.y0 : 0,
-              bbox: l.bbox || null,
-            }))
-            .sort((a, b) => a.top - b.top) // sparse mode: restore reading order
-        : String(data.text || '').split('\n').map((t) => ({ text: t, confidence: data.confidence, height: 0 }));
       // Active tap-target? Convert it from video coords into this crop's
       // coordinate space so nearest-line matching works.
       let cropTarget = null;
@@ -243,25 +231,59 @@ export function createLens(opts) {
         target = null; // expired
       }
       const crop = lastCrop;
-      const items = selectPrices(lines, { shopCurrency: shop, target: cropTarget }).map((sel) => {
-        const from = sel.currency || shop;
-        const converted = convert(sel.value, from, home, rates);
-        if (!Number.isFinite(converted)) return null;
-        // Map the matched line's bbox back to VIDEO coordinates so the UI
-        // can draw the lock-on box over the live camera.
-        const box = (sel.bbox && crop) ? {
-          x0: crop.bandX + sel.bbox.x0 / crop.scale,
-          y0: crop.bandY + sel.bbox.y0 / crop.scale,
-          x1: crop.bandX + sel.bbox.x1 / crop.scale,
-          y1: crop.bandY + sel.bbox.y1 / crop.scale,
-        } : null;
-        return {
-          value: sel.value, from, home, converted,
-          fromText: formatMoney(sel.value, from),
-          homeText: formatMoney(converted, home),
-          raw: sel.raw, box,
-        };
-      }).filter(Boolean);
+
+      // OCR one canvas → converted price items. Shared by both passes.
+      const runPass = async (cv) => {
+        // Watchdog: a wedged recognize() must not freeze the loop forever.
+        const rec = await Promise.race([
+          worker.recognize(cv),
+          new Promise((_, rej) => setTimeout(() => rej(new Error('ocr-timeout')), OCR_TIMEOUT_MS)),
+        ]);
+        const { data } = rec;
+        // Feed OCR lines (with their pixel heights) to the shared selection
+        // logic: strict per-line parsing, big-print priority, and per-unit
+        // price demotion — identical to what tools/lens-eval.mjs scores.
+        const lines = (data.lines && data.lines.length)
+          ? data.lines
+              .map((l) => ({
+                text: l.text,
+                confidence: l.confidence,
+                height: l.bbox ? (l.bbox.y1 - l.bbox.y0) : 0,
+                top: l.bbox ? l.bbox.y0 : 0,
+                bbox: l.bbox || null,
+              }))
+              .sort((a, b) => a.top - b.top) // sparse mode: restore reading order
+          : String(data.text || '').split('\n').map((t) => ({ text: t, confidence: data.confidence, height: 0 }));
+        const items = selectPrices(lines, { shopCurrency: shop, target: cropTarget }).map((sel) => {
+          const from = sel.currency || shop;
+          const converted = convert(sel.value, from, home, rates);
+          if (!Number.isFinite(converted)) return null;
+          // Map the matched line's bbox back to VIDEO coordinates so the UI
+          // can draw the lock-on box over the live camera.
+          const box = (sel.bbox && crop) ? {
+            x0: crop.bandX + sel.bbox.x0 / crop.scale,
+            y0: crop.bandY + sel.bbox.y0 / crop.scale,
+            x1: crop.bandX + sel.bbox.x1 / crop.scale,
+            y1: crop.bandY + sel.bbox.y1 / crop.scale,
+          } : null;
+          return {
+            value: sel.value, from, home, converted,
+            fromText: formatMoney(sel.value, from),
+            homeText: formatMoney(converted, home),
+            raw: sel.raw, box,
+          };
+        }).filter(Boolean);
+        return { items, confidence: data.confidence };
+      };
+
+      // Pass A: standard contrast. Pass B (same frame, dot-fused) only runs
+      // when A finds nothing — dot-matrix tag prints reach OCR as separated
+      // dots that plain binarisation can't read.
+      let { items, confidence } = await runPass(canvas);
+      if (!items.length) {
+        const fused = applyDotMatrixPass();
+        if (fused) ({ items, confidence } = await runPass(fused));
+      }
       if (items.length) {
         // Two-frame voting: only surface a reading the OCR produced twice in
         // a row. Single-frame hallucinations (glare, motion blur, overlapping
@@ -275,7 +297,7 @@ export function createLens(opts) {
             items,
             multi: items.length > 1,
             ...items[0], // single-price consumers keep working unchanged
-            confidence: Math.round(data.confidence),
+            confidence: Math.round(confidence),
           });
         }
       }

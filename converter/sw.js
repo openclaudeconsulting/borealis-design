@@ -5,13 +5,13 @@
    works offline afterwards. The live FX API is never cached.
    ============================================================ */
 
-const VERSION = 'v11';
+const VERSION = 'v12';
 const SHELL_CACHE = `roam-shell-${VERSION}`;
 const RUNTIME_CACHE = `roam-runtime-${VERSION}`;
 
 const SHELL_ASSETS = [
   './', './index.html', './app.js', './lens.js', './manifest.webmanifest',
-  './lib/convert.js', './lib/parsePrice.js', './lib/units.js', './lib/sizes.js',
+  './lib/convert.js', './lib/parsePrice.js', './lib/ocrPrep.js', './lib/units.js', './lib/sizes.js',
   './lib/tips.js', './lib/countries.js', './lib/phrases.js',
   './icons/icon-192.png', './icons/icon-512.png', './icons/icon-maskable-512.png',
   './icons/apple-touch-icon.png', '/favicon.svg',
