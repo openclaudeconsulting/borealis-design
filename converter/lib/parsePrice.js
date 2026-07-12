@@ -44,11 +44,15 @@ export const SYMBOL_FAMILIES = {
 const SYMBOL_TOKENS = ['CHF', 'R$', 'Rp', 'RM', 'zł', 'Kč', 'Ft', 'Fr', 'kr',
   '€', '£', '$', '¥', '₩', '₹', '฿', '₺', '₫', '₴', '₪', '₱', '﷼'];
 
-// Any 3-letter ISO code we recognise as a currency in free text.
+// Any 3-letter ISO code we recognise as a currency in free text. Keep this
+// to currencies the app actually converts: every extra code is a false-
+// positive surface (rotated-glyph garbage once OCR'd as "66 VES" and the
+// unwanted VES entry blessed it as a price).
 const ISO_CODES = new Set([
   'USD','EUR','GBP','JPY','CNY','AUD','CAD','CHF','INR','MXN','BRL','KRW','SGD',
   'HKD','NZD','SEK','NOK','DKK','PLN','THB','ZAR','TRY','AED','PHP','CZK','HUF',
-  'ILS','MYR','IDR','VND','ISK','SAR','QAR','RON','CLP','COP','ARS','UAH','TWD','VES',
+  'ILS','MYR','IDR','VND','ISK','SAR','RON','CLP','COP','ARS','UAH','TWD','EGP',
+  'MAD','PEN',
 ]);
 
 // Currencies whose everyday prices are whole numbers — a bare integer there
