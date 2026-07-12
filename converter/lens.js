@@ -54,6 +54,10 @@ export function createLens(opts) {
   const {
     video, ocrCanvas, onResult, onStatus = () => {}, onError = () => {}, onStale = () => {},
     getShopCurrency, getHomeCurrency, getRates,
+    // When true (a trip destination is set), every scanned price is treated
+    // as the shop currency — an OCR-misread € or a printed foreign ISO code
+    // can no longer flip the conversion to the wrong currency.
+    getCurrencyLock = () => false,
     intervalMs = 750,
   } = opts;
 
@@ -324,7 +328,7 @@ export function createLens(opts) {
           itemCacheConf = data.confidence;
         }
         const items = selectFromItems(all, { target: passTarget }).map((sel) => {
-          const from = sel.currency || shop;
+          const from = getCurrencyLock() ? shop : (sel.currency || shop);
           const converted = convert(sel.value, from, home, rates);
           if (!Number.isFinite(converted)) return null;
           // Map the matched line's bbox (possibly in rotated coords) back to
@@ -444,7 +448,7 @@ export function createLens(opts) {
     }
     if (!best || bestD > TAP_HIT_RADIUS) return false;
     const shop = getShopCurrency(), home = getHomeCurrency();
-    const from = best.currency || shop;
+    const from = getCurrencyLock() ? shop : (best.currency || shop);
     const converted = convert(best.value, from, home, getRates());
     if (!Number.isFinite(converted)) return false;
     const item = {

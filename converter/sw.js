@@ -5,14 +5,15 @@
    works offline afterwards. The live FX API is never cached.
    ============================================================ */
 
-const VERSION = 'v14';
+// Keep in sync with APP_VERSION in ./lib/version.js (shown in the UI).
+const VERSION = 'v15';
 const SHELL_CACHE = `roam-shell-${VERSION}`;
 const RUNTIME_CACHE = `roam-runtime-${VERSION}`;
 
 const SHELL_ASSETS = [
   './', './index.html', './app.js', './lens.js', './manifest.webmanifest',
   './lib/convert.js', './lib/parsePrice.js', './lib/ocrPrep.js', './lib/units.js', './lib/sizes.js',
-  './lib/tips.js', './lib/countries.js', './lib/phrases.js',
+  './lib/tips.js', './lib/countries.js', './lib/phrases.js', './lib/version.js',
   './icons/icon-192.png', './icons/icon-512.png', './icons/icon-maskable-512.png',
   './icons/apple-touch-icon.png', '/favicon.svg',
 ];
