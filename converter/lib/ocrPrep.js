@@ -13,6 +13,32 @@
      finds no prices.
    ============================================================ */
 
+/* ---------- rotation transforms (image space) ----------
+   The Lens rotates the crop to read sideways tags. rot 90 = image rotated
+   90° clockwise (canvas: translate(H,0); rotate(+90)); rot 270 = 90° CCW
+   (translate(0,W); rotate(-90)). W/H are the BASE (unrotated) dimensions. */
+
+/** Map a point from base coords into the rotated image's coords. */
+export function rotatePointFromBase(x, y, rot, baseW, baseH) {
+  if (rot === 90) return { x: baseH - y, y: x };
+  if (rot === 270) return { x: y, y: baseW - x };
+  return { x, y };
+}
+
+/** Map a bbox {x0,y0,x1,y1} from rotated-image coords back to base coords. */
+export function rotateBoxToBase(bbox, rot, baseW, baseH) {
+  if (rot !== 90 && rot !== 270) return bbox;
+  const inv = (xr, yr) => rot === 90
+    ? { x: yr, y: baseH - xr }
+    : { x: baseW - yr, y: xr };
+  const a = inv(bbox.x0, bbox.y0);
+  const b = inv(bbox.x1, bbox.y1);
+  return {
+    x0: Math.min(a.x, b.x), y0: Math.min(a.y, b.y),
+    x1: Math.max(a.x, b.x), y1: Math.max(a.y, b.y),
+  };
+}
+
 /** Greyscale + contrast stretch, in place. */
 export function greyContrast(data, width, height, contrast = 1.35) {
   for (let i = 0; i < data.length; i += 4) {

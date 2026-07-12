@@ -198,6 +198,25 @@ const CORPUS = [
     </div>`,
   },
   {
+    name: 'vertical tag (rotated 90°, solid print)',
+    shop: 'CAD', expect: [34.99],
+    html: `<div style="transform:rotate(90deg);font-family:Arial;text-align:center">
+      <div style="font-size:22px;font-weight:600">OUTDOOR GEAR</div>
+      <div style="font-size:58px;font-weight:800">$34.99</div>
+    </div>`,
+  },
+  {
+    name: 'vertical dot-matrix tag (the Tremblant photo: rotated AND dotted)',
+    shop: 'CAD', expect: [70],
+    html: `<div style="transform:rotate(-90deg);font-family:'Courier New',monospace;text-align:center">
+      <div style="font-size:20px;font-weight:700">Boutiques Tremblant</div>
+      <div style="position:relative;display:inline-block;font-size:64px;font-weight:700;margin:4px 0">$70.00
+        <div style="position:absolute;inset:0;background:repeating-linear-gradient(0deg,rgba(255,255,255,0) 0 3px,#fff 3px 6px),repeating-linear-gradient(90deg,rgba(255,255,255,0) 0 3px,#fff 3px 6px)"></div>
+      </div>
+      <div style="font-size:20px;font-weight:700">NOIR &nbsp; 6</div>
+    </div>`,
+  },
+  {
     name: 'electronics tag: big price beats small SKU line',
     shop: 'USD', expect: [499.99],
     html: `<div style="padding:22px;font-family:Arial;text-align:center">
@@ -228,9 +247,9 @@ async function main() {
   const prepSrc = fs.readFileSync(path.join(here, '..', 'converter', 'lib', 'ocrPrep.js'), 'utf8').replace(/export /g, '');
   const prep = await browser.newPage({ viewport: { width: 760, height: 460 } });
   await prep.addScriptTag({ content: prepSrc });
-  const preprocess = async (pngBuf, mode) => {
+  const preprocess = async (pngBuf, mode, rot = 0) => {
     const dataUrl = 'data:image/png;base64,' + pngBuf.toString('base64');
-    const out = await prep.evaluate(async ({ dataUrl, mode }) => {
+    const out = await prep.evaluate(async ({ dataUrl, mode, rot }) => {
       const img = new Image();
       await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = dataUrl; });
       const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
@@ -238,8 +257,15 @@ async function main() {
       const d = x.getImageData(0, 0, c.width, c.height);
       if (mode === 'fuse') dotMatrixFuse(d.data, c.width, c.height); else greyContrast(d.data, c.width, c.height);
       x.putImageData(d, 0, 0);
-      return c.toDataURL('image/png');
-    }, { dataUrl, mode });
+      if (rot !== 90 && rot !== 270) return c.toDataURL('image/png');
+      // Same rotation ops as converter/lens.js buildPassCanvas.
+      const r = document.createElement('canvas'); r.width = c.height; r.height = c.width;
+      const rx = r.getContext('2d');
+      if (rot === 90) { rx.translate(c.height, 0); rx.rotate(Math.PI / 2); }
+      else { rx.translate(0, c.width); rx.rotate(-Math.PI / 2); }
+      rx.drawImage(c, 0, 0);
+      return r.toDataURL('image/png');
+    }, { dataUrl, mode, rot });
     return Buffer.from(out.split(',')[1], 'base64');
   };
   const ocrSelect = async (buf, shop) => {
@@ -256,10 +282,14 @@ async function main() {
   for (const c of CORPUS) {
     await page.setContent(`<body style="margin:0;background:#fff;color:#000;display:flex;align-items:center;justify-content:center;min-height:460px">${c.html}</body>`);
     const png = await page.screenshot();
-    // Pass A (standard contrast); pass B (dot-fuse) only if A found nothing —
-    // exactly the live Lens pipeline.
-    let { got, text } = await ocrSelect(await preprocess(png, 'grey'), c.shop);
-    if (!got.length) ({ got, text } = await ocrSelect(await preprocess(png, 'fuse'), c.shop));
+    // Same fallback ladder as the live Lens: upright contrast first, then
+    // dot-fuse, then rotations (solid + fused) until something reads.
+    const LADDER = [['grey',0],['fuse',0],['grey',90],['fuse',90],['grey',270],['fuse',270]];
+    let got = [], text = '';
+    for (const [mode, rot] of LADDER) {
+      ({ got, text } = await ocrSelect(await preprocess(png, mode, rot), c.shop));
+      if (got.length) break;
+    }
     const data = { text };
     const ok = got.length === c.expect.length && got.every((v, i) => Math.abs(v - c.expect[i]) < 1e-9);
     if (ok) { pass++; console.log(`PASS  ${c.name}  →  [${got.join(', ')}]`); }
