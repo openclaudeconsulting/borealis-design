@@ -274,6 +274,38 @@ const CORPUS = [
       <div style="font-size:16px;margin-top:8px">Stk 5 &nbsp;&nbsp; OBD018 &nbsp;&nbsp; 084-7236-8</div>
     </div>`,
   },
+  // ——— Sports-store sale tags (IMG_2039/2041/2043): a "Notre prix rég."
+  // was-price decoy in medium print above a huge superscript-cents sale
+  // price. The rég line must be demoted and the sale price stitched.
+  {
+    // Tesseract misreads the raised ⁹⁹ as "%" here ("79%"), so exact cents
+    // are unrecoverable — the raised-% strip + dominant-integer rescue must
+    // surface the 79 dollars instead of killing the price entirely.
+    name: 'sale tag: Notre prix rég decoy vs big sale price (Under Armour)',
+    shop: 'CAD', expect: [79],
+    html: `<div style="width:520px;padding:16px;font-family:Arial;background:#fff;text-align:center">
+      <div style="font-size:30px;font-weight:800">UNDER ARMOUR</div>
+      <div style="font-size:26px;font-weight:700">Sonic 7</div>
+      <div style="font-size:22px">Chaussures entrainement homme</div>
+      <div style="font-size:22px">3028002-001</div>
+      <div style="font-size:24px;margin-top:6px">Notre prix rég. 129<span style="font-size:14px;vertical-align:10px">99</span></div>
+      <div style="font-size:92px;font-weight:800;line-height:1">79<span style="font-size:40px;vertical-align:52px">99</span></div>
+      <div style="font-size:24px;margin-top:6px">Rabais plus de 35%</div>
+    </div>`,
+  },
+  {
+    name: 'sale tag: rég 149 decoy, Merrell layout',
+    shop: 'CAD', expect: [89],
+    html: `<div style="width:520px;padding:16px;font-family:Arial;background:#fff;text-align:center">
+      <div style="font-size:30px;font-weight:800">MERRELL</div>
+      <div style="font-size:26px;font-weight:700">Moab 3</div>
+      <div style="font-size:22px">Chaussures plein air</div>
+      <div style="font-size:22px">homme J038207-N/A</div>
+      <div style="font-size:24px;margin-top:6px">Notre prix rég. 149<span style="font-size:14px;vertical-align:10px">99</span></div>
+      <div style="font-size:92px;font-weight:800;line-height:1">89<span style="font-size:40px;vertical-align:52px">99</span></div>
+      <div style="font-size:24px;margin-top:6px">Rabais 40%</div>
+    </div>`,
+  },
 ];
 
 /* ============================================================ */
@@ -328,7 +360,15 @@ async function main() {
     const words = (data.words || [])
       .filter((w) => w && w.text && /\d/.test(w.text))
       .map((w) => ({ text: w.text, confidence: w.confidence, bbox: w.bbox || null }));
-    return { got: selectPrices(lines, { shopCurrency: shop, words }).map((i) => i.value), text: data.text };
+    // Percent-sign character boxes (raised-% = misread superscript cents).
+    const pctSyms = [];
+    for (const w of data.words || []) {
+      for (const sym of w.symbols || []) if (sym && sym.text === '%' && sym.bbox) pctSyms.push(sym.bbox);
+    }
+    for (const sym of data.symbols || []) {
+      if (sym && sym.text === '%' && sym.bbox) pctSyms.push(sym.bbox);
+    }
+    return { got: selectPrices(lines, { shopCurrency: shop, words, pctSyms }).map((i) => i.value), text: data.text };
   };
 
   let pass = 0, fail = 0;
