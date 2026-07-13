@@ -230,7 +230,9 @@ const UNIT_PRICE_LINE = /\/\s*\d*\s*(ml|cl|l|g|kg|lb|lbs|oz|ea|un|unit|pc|pcs|ea
 // "REG 949.99"), and bundled fees ("inclus ENV 1,30", deposits). Real
 // shelf labels put these in smaller print, but OCR height alone isn't
 // always enough — the words are the reliable signal.
-const CONTEXT_PRICE_LINE = /(rabais|était|etait|prix\s*cour|ancien|économis|economis|\bsave\b|\bwas\b|\breg\b|régulier|regulier|courant|inclus|\benv\b|consigne|deposit)/i;
+// \br[ée]g\b covers "REG 949.99" AND the accented "Notre prix rég. 129⁹⁹"
+// (the Sports Experts decoy line that used to win the green box).
+const CONTEXT_PRICE_LINE = /(rabais|était|etait|prix\s*cour|notre\s*prix|ancien|économis|economis|\bsave\b|\bwas\b|\br[ée]g\b|régulier|regulier|courant|inclus|\benv\b|consigne|deposit)/i;
 
 /**
  * Stitch superscript cents back onto their price. Electronic shelf labels
@@ -244,7 +246,7 @@ const CONTEXT_PRICE_LINE = /(rabais|était|etait|prix\s*cour|ancien|économis|ec
  *    2-digit line horizontally adjacent to a line ending in a bare integer;
  *  - same line: "699 99" at the very end of a line with no other decimals.
  */
-export function stitchCents(lines, words) {
+export function stitchCents(lines, words, pctSyms) {
   if (!lines || !lines.length) return lines || [];
   const out = lines.map((l) => ({ ...l }));
   const isCents = (t) => /^\s*\d{2}\s*$/.test(t || '');
@@ -252,6 +254,29 @@ export function stitchCents(lines, words) {
     const cx = (b.x0 + b.x1) / 2, cy = (b.y0 + b.y1) / 2;
     return cx >= box.x0 && cx <= box.x1 && cy >= box.y0 && cy <= box.y1;
   };
+  // A "%" that is actually superscript cents: Tesseract misreads the tiny
+  // raised "99" as a percent sign ("79⁹⁹" → "79%"), and the percent guard
+  // then kills the real price. The tell is geometry: a REAL percent sign is
+  // near line height and sits on the baseline ("Rabais 40%" → 73–92% of the
+  // line box); misread cents are small (≈35–40%) and float high. Strip the
+  // impostor so the dollars survive as an integer (exact cents are
+  // unreadable at this point — the dominant-integer rescue shows .00).
+  for (const l of out) {
+    if (!l.text || !l.bbox || !/\d\s*%\s*$/.test(l.text)) continue;
+    const lh = l.bbox.y1 - l.bbox.y0;
+    if (!(lh > 0)) continue;
+    for (const ps of pctSyms || []) {
+      if (!ps || !ps.x0 && ps.x0 !== 0) continue;
+      const cx = (ps.x0 + ps.x1) / 2, cy = (ps.y0 + ps.y1) / 2;
+      if (cx < l.bbox.x0 + 0.5 * (l.bbox.x1 - l.bbox.x0)) continue; // right end only
+      if (cx > l.bbox.x1 + 4 || cy < l.bbox.y0 || cy > l.bbox.y1) continue; // inside this line
+      const sh = ps.y1 - ps.y0;
+      if (sh >= 0.55 * lh) continue;                    // near-full height → real %
+      if (l.bbox.y1 - ps.y1 < 0.25 * lh) continue;      // on the baseline → real %
+      l.text = l.text.replace(/\s*%\s*$/, '');
+      break;
+    }
+  }
   // Superscript candidates: standalone 2-digit lines, plus 2-digit WORDS
   // living inside unrelated lines — sparse-text OCR loves gluing a
   // superscript onto whatever text row sits at the same height (the real
@@ -260,19 +285,26 @@ export function stitchCents(lines, words) {
   for (const l of out) if (isCents(l.text) && l.bbox) sups.push({ text: l.text.trim(), bbox: l.bbox, confidence: l.confidence, line: l });
   for (const w of words || []) if (w && isCents(w.text) && w.bbox) sups.push({ text: String(w.text).trim(), bbox: w.bbox, confidence: w.confidence, word: true });
   // The big half: a line that IS a bare integer (optional currency symbol).
+  // TWO digits minimum: in the field, stray single-digit fragments (a "9"
+  // clipped out of "79") were grabbing loose "00" words from product-code
+  // boxes and inventing CA$9.00 prices.
   const bigs = out
-    .filter((l) => l.bbox && /^\s*[€£$¥₩₹฿]?\s*\d{1,5}\s*$/.test(l.text || ''))
+    .filter((l) => l.bbox && /^\s*[€£$¥₩₹฿]?\s*\d{2,5}\s*$/.test(l.text || ''))
     .sort((a, b) => (b.bbox.y1 - b.bbox.y0) - (a.bbox.y1 - a.bbox.y0)); // tallest claims first
   for (const big of bigs) {
     const bh = big.bbox.y1 - big.bbox.y0;
     if (!(bh > 0)) continue;
     const bw = big.bbox.x1 - big.bbox.x0;
     const bcx = (big.bbox.x0 + big.bbox.x1) / 2;
+    // "$129" + "99" — when OCR loses the dot in "$129.99" the cents are the
+    // SAME height, not superscript. The currency symbol already proves the
+    // line is money, so same-height cents are allowed to reattach.
+    const hasSym = /[€£$¥₩₹฿]/.test(big.text);
     let best = null, bestGap = Infinity;
     for (const s of sups) {
       if (s.used || s.line === big) continue;
       const sh = s.bbox.y1 - s.bbox.y0;
-      if (!(sh >= 0.15 * bh && sh <= 0.85 * bh)) continue;  // clearly smaller print
+      if (!(sh >= 0.15 * bh && sh <= (hasSym ? 1.15 : 0.85) * bh)) continue; // smaller print (unless symbol-anchored)
       // Horizontally: hugging the big number's RIGHT end. Sparse-text boxes
       // are inflated (the big line's box often already covers the cents), so
       // edge-gap math is unreliable — use box relations instead.
@@ -340,7 +372,7 @@ export function stitchCents(lines, words) {
  */
 export function collectPrices(lines, opts = {}) {
   const minConf = opts.minConfidence == null ? 30 : opts.minConfidence;
-  const stitched = stitchCents(lines, opts.words);
+  const stitched = stitchCents(lines, opts.words, opts.pctSyms);
   const items = [];
   let idx = 0;
   for (const ln of stitched) {
@@ -363,32 +395,43 @@ export function collectPrices(lines, opts = {}) {
   // superscript cents (it discards them as noise beside 100px digits), so
   // the giant "699" stays a bare integer and strict evidence rejects it —
   // leaving a small discount/fee line as the only "price" on the tag.
-  // When a tag ALREADY proves it's a price surface (some evidenced price
-  // exists) and a pure-integer line towers ≥1.8× above every evidenced
-  // line, that integer IS the asking price's dollars: show it (cents
-  // unknown → .00) rather than the wrong small print. Confidence is
-  // ignored here — Tesseract reports bogus 0s for giant digits — the
-  // structure (pure short integer, dominant height) is the evidence.
-  if (!ZERO_DECIMAL.has(opts.shopCurrency) && items.length) {
-    const maxPricedH = Math.max(...items.map((i) => i.height));
-    if (maxPricedH > 0) {
-      for (const ln of stitched) {
-        if (!ln || !ln.text || !(ln.height >= 1.8 * maxPricedH)) continue;
-        if (!/^\s*[€£$¥₩₹฿]?\s*\d{2,6}\s*$/.test(ln.text)) continue;
-        const value = parseNumber(ln.text);
-        if (!Number.isFinite(value) || value < 10 || value > 99999) continue;
-        items.push({
-          value,
-          currency: opts.shopCurrency || null,
-          raw: ln.text.trim(),
-          height: ln.height || 0,
-          unitPrice: false,
-          contextPrice: false,
-          bbox: ln.bbox || null,
-          order: idx++,
-          dominantInt: true,
-        });
+  // Two shapes of evidence unlock it:
+  // - an evidenced price exists somewhere on the tag, and the integer
+  //   towers ≥1.8× above every evidenced line; or
+  // - NO price is evidenced anywhere (all cents were unreadable) but the
+  //   frame is tag-like — several lines of text — and the integer towers
+  //   ≥1.8× above every OTHER text line. A lone giant "40" on a sign stays
+  //   rejected (too few lines); menus/receipts fail the height ratio.
+  // Confidence is ignored here — Tesseract reports bogus 0s for giant
+  // digits — the structure (pure short integer, dominant height) is the
+  // evidence.
+  if (!ZERO_DECIMAL.has(opts.shopCurrency)) {
+    const hadEvidence = items.length > 0;
+    const maxPricedH = hadEvidence ? Math.max(...items.map((i) => i.height)) : 0;
+    const textLines = stitched.filter((l) => l && l.text && /\S/.test(l.text));
+    for (const ln of stitched) {
+      if (!ln || !ln.text) continue;
+      if (!/^\s*[€£$¥₩₹฿]?\s*\d{2,6}\s*$/.test(ln.text)) continue;
+      if (hadEvidence) {
+        if (!(ln.height >= 1.8 * maxPricedH && maxPricedH > 0)) continue;
+      } else {
+        if (textLines.length < 4) continue; // not tag-like enough
+        const maxOtherH = Math.max(...textLines.filter((o) => o !== ln).map((o) => o.height || 0));
+        if (!(maxOtherH > 0 && ln.height >= 1.8 * maxOtherH)) continue;
       }
+      const value = parseNumber(ln.text);
+      if (!Number.isFinite(value) || value < 10 || value > 99999) continue;
+      items.push({
+        value,
+        currency: opts.shopCurrency || null,
+        raw: ln.text.trim(),
+        height: ln.height || 0,
+        unitPrice: false,
+        contextPrice: false,
+        bbox: ln.bbox || null,
+        order: idx++,
+        dominantInt: true,
+      });
     }
   }
   return items;
