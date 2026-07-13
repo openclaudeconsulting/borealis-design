@@ -225,6 +225,109 @@ export function parsePrice(text, opts = {}) {
    ============================================================ */
 const UNIT_PRICE_LINE = /\/\s*\d*\s*(ml|cl|l|g|kg|lb|lbs|oz|ea|un|unit|pc|pcs|each)\b/i;
 
+// Lines whose price is CONTEXT, not the asking price: discount amounts
+// ("RABAIS 270,00"), was-prices ("était 949,99", "prix courant 969,99",
+// "REG 949.99"), and bundled fees ("inclus ENV 1,30", deposits). Real
+// shelf labels put these in smaller print, but OCR height alone isn't
+// always enough — the words are the reliable signal.
+const CONTEXT_PRICE_LINE = /(rabais|était|etait|prix\s*cour|ancien|économis|economis|\bsave\b|\bwas\b|\breg\b|régulier|regulier|courant|inclus|\benv\b|consigne|deposit)/i;
+
+/**
+ * Stitch superscript cents back onto their price. Electronic shelf labels
+ * and big-print tags write "699⁹⁹": a huge integer with tiny top-aligned
+ * cents and NO separator. OCR returns them as separate bare integers, and
+ * strict evidence (rightly) rejects bare integers — so the REAL price
+ * vanishes and a smaller "RABAIS 270,00" or fee line wins. This repairs
+ * the pair into "699.99" before parsing.
+ * Two forms:
+ *  - separate lines: a small (18–80% of big height), top-aligned, exactly-
+ *    2-digit line horizontally adjacent to a line ending in a bare integer;
+ *  - same line: "699 99" at the very end of a line with no other decimals.
+ */
+export function stitchCents(lines, words) {
+  if (!lines || !lines.length) return lines || [];
+  const out = lines.map((l) => ({ ...l }));
+  const isCents = (t) => /^\s*\d{2}\s*$/.test(t || '');
+  const centerIn = (b, box) => {
+    const cx = (b.x0 + b.x1) / 2, cy = (b.y0 + b.y1) / 2;
+    return cx >= box.x0 && cx <= box.x1 && cy >= box.y0 && cy <= box.y1;
+  };
+  // Superscript candidates: standalone 2-digit lines, plus 2-digit WORDS
+  // living inside unrelated lines — sparse-text OCR loves gluing a
+  // superscript onto whatever text row sits at the same height (the real
+  // DeWalt tag came back as "RABOT DEWALT 13 99" + a separate "699").
+  const sups = [];
+  for (const l of out) if (isCents(l.text) && l.bbox) sups.push({ text: l.text.trim(), bbox: l.bbox, confidence: l.confidence, line: l });
+  for (const w of words || []) if (w && isCents(w.text) && w.bbox) sups.push({ text: String(w.text).trim(), bbox: w.bbox, confidence: w.confidence, word: true });
+  // The big half: a line that IS a bare integer (optional currency symbol).
+  const bigs = out
+    .filter((l) => l.bbox && /^\s*[€£$¥₩₹฿]?\s*\d{1,5}\s*$/.test(l.text || ''))
+    .sort((a, b) => (b.bbox.y1 - b.bbox.y0) - (a.bbox.y1 - a.bbox.y0)); // tallest claims first
+  for (const big of bigs) {
+    const bh = big.bbox.y1 - big.bbox.y0;
+    if (!(bh > 0)) continue;
+    const bw = big.bbox.x1 - big.bbox.x0;
+    const bcx = (big.bbox.x0 + big.bbox.x1) / 2;
+    let best = null, bestGap = Infinity;
+    for (const s of sups) {
+      if (s.used || s.line === big) continue;
+      const sh = s.bbox.y1 - s.bbox.y0;
+      if (!(sh >= 0.15 * bh && sh <= 0.85 * bh)) continue;  // clearly smaller print
+      // Horizontally: hugging the big number's RIGHT end. Sparse-text boxes
+      // are inflated (the big line's box often already covers the cents), so
+      // edge-gap math is unreliable — use box relations instead.
+      if (s.bbox.x0 < bcx) continue;                        // right half only
+      if (s.bbox.x1 < big.bbox.x1 - 0.15 * bw) continue;    // reaches the right end
+      if (s.bbox.x0 > big.bbox.x1 + 1.6 * sh) continue;     // ...but not far past it
+      // Vertically: overlapping and top-aligned (superscript, not baseline).
+      if (s.bbox.y1 <= big.bbox.y0 || s.bbox.y0 >= big.bbox.y1) continue;
+      if (s.bbox.y0 > big.bbox.y0 + 0.55 * bh) continue;
+      if (s.bbox.y1 > big.bbox.y1 + 0.25 * bh) continue;
+      const gap = Math.abs(s.bbox.x0 - big.bbox.x1);
+      if (gap < bestGap) { bestGap = gap; best = s; }
+    }
+    if (!best) continue;
+    best.used = true;
+    big.text = big.text.replace(/\s*$/, '') + '.' + best.text;
+    big.bbox = {
+      x0: Math.min(big.bbox.x0, best.bbox.x0), y0: Math.min(big.bbox.y0, best.bbox.y0),
+      x1: Math.max(big.bbox.x1, best.bbox.x1), y1: Math.max(big.bbox.y1, best.bbox.y1),
+    };
+    big.height = Math.max(big.height || 0, bh);
+    // Giant sparse-text digits often carry a bogus 0 line confidence while
+    // the underlying WORDS score fine — trust the strongest member. (Only
+    // when someone actually reported one: absent stays absent.)
+    const confs = [big.confidence, best.confidence];
+    for (const w of words || []) {
+      if (w && w.bbox && /^\d{1,5}$/.test(String(w.text || '').trim()) && centerIn(w.bbox, big.bbox)) {
+        confs.push(w.confidence);
+      }
+    }
+    const known = confs.filter((c) => typeof c === 'number');
+    if (known.length) big.confidence = Math.max(...known);
+    if (best.line) {
+      best.line.__consumed = true;
+    } else {
+      // The cents word was glued into another line — strip it there so the
+      // leftover "PRODUCT NAME 99" can't fake a price later.
+      for (const l of out) {
+        if (l === big || !l.bbox || !l.text) continue;
+        if (!centerIn(best.bbox, l.bbox)) continue;
+        const re = new RegExp('\\s*' + best.text + '\\s*$');
+        if (re.test(l.text)) l.text = l.text.replace(re, '');
+      }
+    }
+  }
+  // Same-line variant: OCR merged the pair into ONE pure-number line
+  // ("699 99"). Only pure pairs — a trailing "13 99" inside a product-name
+  // line is more likely a glued superscript belonging to a neighbour.
+  for (const l of out) {
+    if (l.__consumed || !l.text) continue;
+    l.text = l.text.replace(/^(\s*[€£$¥₩₹฿]?\s*\d{1,5})[ \u00A0]{1,2}(\d{2})\s*$/, '$1.$2');
+  }
+  return out.filter((l) => !l.__consumed);
+}
+
 /**
  * Parse EVERY priced line into an item — no size filtering, no ranking.
  * The Lens caches this full set per frame so a tap can be answered from
@@ -237,9 +340,10 @@ const UNIT_PRICE_LINE = /\/\s*\d*\s*(ml|cl|l|g|kg|lb|lbs|oz|ea|un|unit|pc|pcs|ea
  */
 export function collectPrices(lines, opts = {}) {
   const minConf = opts.minConfidence == null ? 30 : opts.minConfidence;
+  const stitched = stitchCents(lines, opts.words);
   const items = [];
   let idx = 0;
-  for (const ln of lines || []) {
+  for (const ln of stitched) {
     if (!ln || !ln.text) continue;
     if (ln.confidence != null && ln.confidence < minConf) continue;
     const parsed = parsePrice(ln.text, { shopCurrency: opts.shopCurrency, strict: true });
@@ -250,9 +354,42 @@ export function collectPrices(lines, opts = {}) {
       raw: parsed.raw,
       height: ln.height || 0,
       unitPrice: UNIT_PRICE_LINE.test(ln.text),
+      contextPrice: CONTEXT_PRICE_LINE.test(ln.text),
       bbox: ln.bbox || null,
       order: idx++,
     });
+  }
+  // DOMINANT-INTEGER RESCUE. Sometimes OCR simply never sees the tiny
+  // superscript cents (it discards them as noise beside 100px digits), so
+  // the giant "699" stays a bare integer and strict evidence rejects it —
+  // leaving a small discount/fee line as the only "price" on the tag.
+  // When a tag ALREADY proves it's a price surface (some evidenced price
+  // exists) and a pure-integer line towers ≥1.8× above every evidenced
+  // line, that integer IS the asking price's dollars: show it (cents
+  // unknown → .00) rather than the wrong small print. Confidence is
+  // ignored here — Tesseract reports bogus 0s for giant digits — the
+  // structure (pure short integer, dominant height) is the evidence.
+  if (!ZERO_DECIMAL.has(opts.shopCurrency) && items.length) {
+    const maxPricedH = Math.max(...items.map((i) => i.height));
+    if (maxPricedH > 0) {
+      for (const ln of stitched) {
+        if (!ln || !ln.text || !(ln.height >= 1.8 * maxPricedH)) continue;
+        if (!/^\s*[€£$¥₩₹฿]?\s*\d{2,6}\s*$/.test(ln.text)) continue;
+        const value = parseNumber(ln.text);
+        if (!Number.isFinite(value) || value < 10 || value > 99999) continue;
+        items.push({
+          value,
+          currency: opts.shopCurrency || null,
+          raw: ln.text.trim(),
+          height: ln.height || 0,
+          unitPrice: false,
+          contextPrice: false,
+          bbox: ln.bbox || null,
+          order: idx++,
+          dominantInt: true,
+        });
+      }
+    }
   }
   return items;
 }
@@ -290,6 +427,9 @@ export function selectFromItems(items, opts = {}) {
   let kept = maxH > 0 ? items.filter((i) => i.height >= 0.6 * maxH) : items;
   // The main price beats per-unit small print.
   if (kept.some((i) => !i.unitPrice)) kept = kept.filter((i) => !i.unitPrice);
+  // …and beats discount/was-price/fee lines ("RABAIS 270,00", "était
+  // 949,99", "inclus ENV 1,30") whenever a non-context price is in view.
+  if (kept.some((i) => !i.contextPrice)) kept = kept.filter((i) => !i.contextPrice);
   if (maxH > 0) {
     kept.sort((a, b) => {
       if (Math.abs(a.height - b.height) <= 0.15 * maxH) return a.order - b.order;

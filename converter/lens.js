@@ -314,7 +314,12 @@ export function createLens(opts) {
               }))
               .sort((a, b) => a.top - b.top) // sparse mode: restore reading order
           : String(data.text || '').split('\n').map((t) => ({ text: t, confidence: data.confidence, height: 0 }));
-        const all = collectPrices(lines, { shopCurrency: shop });
+        // Word-level detail feeds superscript-cents stitching ("699⁹⁹" ESL
+        // tags) — sparse mode often glues the tiny cents onto another line.
+        const words = (data.words || [])
+          .filter((w) => w && w.text && /\d/.test(w.text))
+          .map((w) => ({ text: w.text, confidence: w.confidence, bbox: w.bbox || null }));
+        const all = collectPrices(lines, { shopCurrency: shop, words });
         // Full-band passes refresh the tap cache with EVERY parsed price in
         // video coordinates — including small print the big-print rule hides —
         // so a tap on any of them is answered from memory instantly.
