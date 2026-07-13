@@ -225,6 +225,55 @@ const CORPUS = [
       <div style="font-size:18px">SKU 04581230 REG 549.99</div>
     </div>`,
   },
+  // ——— Electronic shelf labels (ESL): superscript cents, no separator.
+  // The real-world failures of IMG_2031/2033/2034: the huge price reads as
+  // bare "699" + "99" (both rejected as prices) and a smaller decimal-
+  // bearing line — the DISCOUNT or a FEE — used to win.
+  {
+    name: 'ESL: superscript cents vs RABAIS banner (DeWalt planer tag)',
+    shop: 'CAD', expect: [699.99],
+    html: `<div style="width:520px;padding:14px;font-family:Arial;background:#fff">
+      <div style="background:#c8102e;color:#fff;font-weight:800;font-size:36px;padding:4px 10px">RABAIS 270,00</div>
+      <div style="font-weight:800;font-size:26px;margin-top:8px">RABOT DEWALT 13 PO</div>
+      <div style="display:flex;gap:18px;align-items:flex-start;margin-top:4px">
+        <div style="font-size:17px;color:#444">prix courant<br>969,99</div>
+        <div style="font-weight:800;font-size:100px;line-height:0.9">699<span style="font-size:44px;vertical-align:60px">99</span></div>
+      </div>
+      <div style="font-size:16px;margin-top:8px">Fin juil 16/26 &nbsp;&nbsp; Stk 4 &nbsp;&nbsp; 028G01</div>
+      <div style="font-size:16px">055-9009-8</div>
+    </div>`,
+  },
+  {
+    // At this render Tesseract never sees the tiny "29" at all (discarded
+    // as noise beside the 100px digits), so exact cents are unrecoverable —
+    // the DOMINANT-INTEGER rescue must still surface the 601 dollars
+    // instead of letting the "inclus ENV 1,30" fee line win.
+    name: 'ESL: superscript cents invisible → dominant-integer rescue (drill tag)',
+    shop: 'CAD', expect: [601],
+    html: `<div style="width:520px;padding:14px;font-family:Arial;background:#fff">
+      <div style="color:#c8102e;font-weight:800;font-size:30px">SUPER ACHAT</div>
+      <div style="font-weight:700;font-size:24px">PERC&amp;VIS PERC DW 20V</div>
+      <div style="font-weight:800;font-size:100px;line-height:0.9;margin-top:4px">601<span style="font-size:44px;vertical-align:60px">29</span></div>
+      <div style="font-size:17px;color:#444">inclus ENV 1,30</div>
+      <div style="font-size:16px;margin-top:8px">025G10 &nbsp; EH305D &nbsp; 054-8787-8</div>
+    </div>`,
+  },
+  {
+    // (The real tag read 584⁹³; headless Chromium's Arial substitute makes
+    // Tesseract misread a giant '5', so the scenario uses 684⁹³ — the logic
+    // under test, stitch + était-column demotion, is digit-agnostic.)
+    name: 'ESL: superscript cents vs était was-price column (liquidation tag)',
+    shop: 'CAD', expect: [684.93],
+    html: `<div style="width:520px;padding:14px;font-family:Arial;background:#fff">
+      <div style="color:#c8102e;font-weight:800;font-size:30px">LIQUIDATION</div>
+      <div style="font-weight:700;font-size:22px">MAIS JEU 2EN1 BANZAI</div>
+      <div style="display:flex;gap:18px;align-items:flex-start;margin-top:4px">
+        <div style="font-size:19px;color:#444">était<br>949,99<br>649,93<br>636,49</div>
+        <div style="font-weight:800;font-size:100px;line-height:0.9">684<span style="font-size:44px;vertical-align:60px">93</span></div>
+      </div>
+      <div style="font-size:16px;margin-top:8px">Stk 5 &nbsp;&nbsp; OBD018 &nbsp;&nbsp; 084-7236-8</div>
+    </div>`,
+  },
 ];
 
 /* ============================================================ */
@@ -272,10 +321,14 @@ async function main() {
     const { data } = await worker.recognize(buf);
     const lines = (data.lines && data.lines.length)
       ? data.lines
-          .map((l) => ({ text: l.text, confidence: l.confidence, height: l.bbox ? (l.bbox.y1 - l.bbox.y0) : 0, top: l.bbox ? l.bbox.y0 : 0 }))
+          .map((l) => ({ text: l.text, confidence: l.confidence, height: l.bbox ? (l.bbox.y1 - l.bbox.y0) : 0, top: l.bbox ? l.bbox.y0 : 0, bbox: l.bbox || null }))
           .sort((a, b) => a.top - b.top)
       : String(data.text || '').split('\n').map((t) => ({ text: t, confidence: data.confidence, height: 0 }));
-    return { got: selectPrices(lines, { shopCurrency: shop }).map((i) => i.value), text: data.text };
+    // Word detail for superscript-cents stitching — keep in sync with lens.js.
+    const words = (data.words || [])
+      .filter((w) => w && w.text && /\d/.test(w.text))
+      .map((w) => ({ text: w.text, confidence: w.confidence, bbox: w.bbox || null }));
+    return { got: selectPrices(lines, { shopCurrency: shop, words }).map((i) => i.value), text: data.text };
   };
 
   let pass = 0, fail = 0;
