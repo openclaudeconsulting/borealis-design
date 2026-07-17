@@ -5,5 +5,5 @@
    on every release (the SW bump is what actually ships updates).
    LENS_VERSION bumps whenever the scanner engine changes.
    ============================================================ */
-export const APP_VERSION = 'v17';
-export const LENS_VERSION = 'v12';
+export const APP_VERSION = 'v18';
+export const LENS_VERSION = 'v13';

@@ -608,6 +608,40 @@ function viewWallet() {
    ============================================================ */
 const lensStage = $('lensStage');
 let lens = null, lensPrevHash = '#/';
+// Sale-rack mode: the % off the rack advertises. Applied at DISPLAY time to
+// every scanned price (single or menu), so all the scanning intelligence —
+// stitching, tap-to-focus, instant answers — works unchanged. In-memory
+// only: a discount should not silently survive into tomorrow's shopping.
+const SALE_OPTIONS = [0, 25, 30, 40, 50, 60, 70];
+let lensSalePct = 0;
+let lastLensResult = null;
+const saleAdj = (v) => v * (1 - lensSalePct / 100);
+function renderSaleChips() {
+  $('lensSale').innerHTML = '<span class="sale-label">% off</span>' + SALE_OPTIONS.map((p) =>
+    `<button class="sale-chip ${p === lensSalePct ? 'on' : ''}" data-sale="${p}">${p === 0 ? 'Off' : '−' + p + '%'}</button>`).join('');
+}
+function renderLensResult(r) {
+  lastLensResult = r;
+  const card = $('lensResult');
+  card.style.display = 'block';
+  card.style.opacity = '1';
+  showLockBox(r.box); // green lock-on around the number being converted
+  const pct = lensSalePct;
+  if (r.multi) {
+    // Several prices in view (a menu): list them converted, in the same
+    // top-to-bottom order they appear on camera.
+    $('lensConv').innerHTML = r.items.map((it) => `
+      <div style="display:flex;align-items:baseline;justify-content:space-between;gap:16px;padding:3px 0">
+        <span style="font-size:15px;opacity:.65;font-weight:600">${it.fromText}</span>
+        <span style="font-size:24px;font-weight:800">${formatMoney(saleAdj(it.converted), it.home)}</span>
+      </div>`).join('');
+    $('lensSrc').innerHTML = `${r.items.length} prices${pct ? ` · −${pct}%` : ''} · ${r.items[0].from} → ${r.items[0].home}`;
+  } else {
+    $('lensConv').textContent = formatMoney(saleAdj(r.converted), r.home);
+    $('lensSrc').innerHTML = `${r.fromText} ${r.from} → ${r.home}` +
+      (pct ? `<br><span class="sale-note">−${pct}% off applied · was ${r.homeText}</span>` : '');
+  }
+}
 // With a trip destination set, the scanner converts ONLY that country's
 // currency into yours (e.g. Canada → CAD to USD): the From picker is pinned.
 function lensLockedCurrency() {
@@ -660,6 +694,7 @@ function openLens() {
   lensStage.classList.add('on');
   document.body.style.overflow = 'hidden';
   fillLensSelects();
+  renderSaleChips();
   $('lensResult').style.display = 'none';
   hideLockBox();
   lensMsg('');
@@ -682,25 +717,7 @@ function openLens() {
         <p class="muted" style="font-size:14px">${esc(e.message)}</p>
         <a href="#/convert" class="btn-ghost" style="margin-top:14px">Convert manually instead</a></div>`);
     },
-    onResult: (r) => {
-      const card = $('lensResult');
-      card.style.display = 'block';
-      card.style.opacity = '1';
-      showLockBox(r.box); // green lock-on around the number being converted
-      if (r.multi) {
-        // Several prices in view (a menu): list them converted, in the same
-        // top-to-bottom order they appear on camera.
-        $('lensConv').innerHTML = r.items.map((it) => `
-          <div style="display:flex;align-items:baseline;justify-content:space-between;gap:16px;padding:3px 0">
-            <span style="font-size:15px;opacity:.65;font-weight:600">${it.fromText}</span>
-            <span style="font-size:24px;font-weight:800">${it.homeText}</span>
-          </div>`).join('');
-        $('lensSrc').textContent = `${r.items.length} prices · ${r.items[0].from} → ${r.items[0].home}`;
-      } else {
-        $('lensConv').textContent = r.homeText;
-        $('lensSrc').textContent = `${r.fromText} ${r.from} → ${r.home}`;
-      }
-    },
+    onResult: renderLensResult,
     // The camera moved on but OCR hasn't matched anything new — dim the old
     // number so it reads as "last seen", not "current".
     onStale: () => {
@@ -715,7 +732,7 @@ function openLens() {
 lensStage.addEventListener('pointerdown', (e) => {
   if (!lens || !lens.isRunning()) return;
   // Ignore taps on controls, pickers, the result card, and overlays.
-  if (e.target.closest('button, select, label, .lens-result, .lens-top, .lens-bottom, .lens-overlay-msg')) return;
+  if (e.target.closest('button, select, label, .lens-result, .lens-top, .lens-bottom, .lens-sale, .lens-overlay-msg')) return;
   const rect = lensStage.getBoundingClientRect();
   const sx = e.clientX - rect.left, sy = e.clientY - rect.top;
   // Camera-style focus ping where the finger landed.
@@ -778,6 +795,14 @@ function closeLens(navigateBack = true) {
 }
 $('lensClose').addEventListener('click', () => closeLens(true));
 $('lensShop').addEventListener('change', (e) => setShop(e.target.value));
+$('lensSale').addEventListener('click', (e) => {
+  const chip = e.target.closest('[data-sale]');
+  if (!chip) return;
+  lensSalePct = Number(chip.dataset.sale) || 0;
+  renderSaleChips();
+  // Retune the reading on screen immediately — no need to re-scan the tag.
+  if (lastLensResult) renderLensResult(lastLensResult);
+});
 $('lensHome').addEventListener('change', (e) => setHome(e.target.value));
 
 /* ============================================================

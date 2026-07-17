@@ -6,7 +6,7 @@
    ============================================================ */
 
 // Keep in sync with APP_VERSION in ./lib/version.js (shown in the UI).
-const VERSION = 'v17';
+const VERSION = 'v18';
 const SHELL_CACHE = `roam-shell-${VERSION}`;
 const RUNTIME_CACHE = `roam-runtime-${VERSION}`;
 
