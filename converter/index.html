@@ -166,6 +166,14 @@
   .lens-result .src { font-size:14px; color:#fff; opacity:.75; margin-top:4px; }
   .lens-pill { display:inline-flex; align-items:center; gap:8px; padding:8px 14px; border-radius:999px; background: rgba(6,5,12,0.75); border:1px solid rgba(255,255,255,0.16); font-size:13px; font-weight:600; }
   .lens-controls { display:flex; align-items:center; gap:10px; }
+  /* Sale-rack quick discount: tap the rack's % off once, every scan
+     converts the AFTER-discount price. */
+  .lens-sale { display:flex; align-items:center; gap:6px; flex-wrap:wrap; justify-content:center; }
+  .lens-sale .sale-label { font-size:12px; font-weight:700; color:#fff; opacity:.75; margin-right:2px; }
+  .sale-chip { padding:7px 12px; border-radius:999px; border:1px solid rgba(255,255,255,0.16); background:rgba(6,5,12,0.75);
+    color:#fff; font-weight:700; font-size:13px; font-family:inherit; cursor:pointer; }
+  .sale-chip.on { background:linear-gradient(120deg, var(--aurora-4), var(--aurora-3)); border-color:transparent; color:#06121c; }
+  .lens-result .sale-note { display:inline-block; font-size:12px; font-weight:800; color:var(--aurora-4); margin-top:4px; }
   .lens-cta-round { width:52px; height:52px; border-radius:999px; display:grid; place-items:center; border:1px solid rgba(255,255,255,0.2); background: rgba(6,5,12,0.7); color:#fff; cursor:pointer; }
   .lens-sel { background: rgba(6,5,12,0.75); color:#fff; border:1px solid rgba(255,255,255,0.18); border-radius:12px; padding:9px 30px 9px 12px; font-weight:700; font-size:14px; appearance:none; -webkit-appearance:none;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none'%3E%3Cpath d='M6 9l6 6 6-6' stroke='%23fff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position: right 9px center; }
@@ -357,6 +365,7 @@
       <div class="conv" id="lensConv">—</div>
       <div class="src" id="lensSrc"></div>
     </div>
+    <div class="lens-sale" id="lensSale" aria-label="Discount to apply to scanned prices"></div>
     <div class="lens-controls">
       <label class="lens-pill" style="gap:6px">From
         <select id="lensShop" class="lens-sel" aria-label="Shop currency"></select>
