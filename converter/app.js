@@ -158,7 +158,7 @@ function viewHome() {
       </div>
       ${destCardHTML()}
       <div class="tile-grid">${tiles}</div>
-      <p class="muted" style="text-align:center; font-size:12px; margin-top:22px">Roam ${APP_VERSION} · Works offline · installable · a Borealis Design experiment</p>
+      <p class="muted" style="text-align:center; font-size:12px; margin-top:22px">Roam ${APP_VERSION} · Works offline · installable · an Open Claude Consulting experiment</p>
     </div>` , mount() {
       document.querySelectorAll('[data-rate-status]').forEach(refreshRateStatus);
       const hd = document.getElementById('homeDest');

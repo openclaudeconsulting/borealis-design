@@ -1,7 +1,7 @@
 /**
- * Borealis Design — Quote Form Handler (Google Apps Script)
+ * Open Claude Consulting — Quote Form Handler (Google Apps Script)
  * ─────────────────────────────────────────────────────────────────────────
- * Receives POST submissions from the contact form on borealisdesign.org
+ * Receives POST submissions from the contact form on the Open Claude Consulting website
  * and emails them to RECIPIENT_EMAIL. Optionally logs each submission to
  * a Google Sheet so there's a permanent record outside Gmail.
  *
@@ -9,7 +9,7 @@
  * ───────────
  *  1. Go to https://script.google.com → "New project"
  *  2. Replace the default code with the contents of THIS file, save
- *     (give the project a name like "Borealis Quote Form")
+ *     (give the project a name like "Open Claude Consulting Quote Form")
  *  3. Click "Deploy" → "New deployment"
  *       Type:           Web app
  *       Execute as:     Me (your-google-account)
@@ -69,7 +69,7 @@ function doPost(e) {
 
     // Build a readable email body.
     const sep = '─'.repeat(60);
-    let body = 'New quote inquiry from borealisdesign.org\n\n' + sep + '\n\n';
+    let body = 'New quote inquiry from the Open Claude Consulting website\n\n' + sep + '\n\n';
 
     Object.keys(FIELD_LABELS).forEach((key) => {
       const value = resolve(key);
@@ -127,6 +127,6 @@ function doPost(e) {
 // Helps verify the deployment URL in a browser.
 function doGet() {
   return ContentService
-    .createTextOutput('Borealis Design quote form handler — POST only.')
+    .createTextOutput('Open Claude Consulting quote form handler — POST only.')
     .setMimeType(ContentService.MimeType.TEXT);
 }
